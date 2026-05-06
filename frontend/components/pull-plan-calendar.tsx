@@ -2,10 +2,11 @@
 
 import { CalendarCreateEventModal } from "@/components/calendar-create-event-modal";
 import { Button } from "@/components/ui/button";
+import { loadAppSettings } from "@/lib/app-settings";
 import { createTask, fetchTasks, type ApiTask } from "@/lib/tasks-api";
 import { cn } from "@/lib/utils";
-import { loadAppSettings } from "@/lib/app-settings";
 import dayjs from "dayjs";
+import { CalendarPlus, ChevronLeft, ChevronRight, Eye, X } from "lucide-react";
 import {
   CalendarContainer,
   mapEventToTask,
@@ -17,25 +18,13 @@ import {
   type TaskModalProps,
 } from "pull-plan-calendar";
 import "pull-plan-calendar/dist/calendar.css";
-import {
-  CalendarPlus,
-  ChevronLeft,
-  ChevronRight,
-  Eye,
-  X,
-} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const calendarNavIconClass = "size-4 shrink-0";
 
 function CalendarAddEventButton({ onClick }: { onClick: () => void }) {
   return (
-    <Button
-      type="button"
-      size="icon"
-      onClick={onClick}
-      aria-label="Add event"
-    >
+    <Button type="button" size="icon" onClick={onClick} aria-label="Add event">
       <CalendarPlus className="size-4" aria-hidden />
     </Button>
   );
@@ -210,8 +199,8 @@ export function PullPlanCalendar() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-3">
+      {/* <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="text-sm text-zinc-600 dark:text-zinc-400">
           {lastSynced
             ? `Last synced ${lastSynced.toLocaleTimeString()} · polling /tasks`
@@ -230,7 +219,7 @@ export function PullPlanCalendar() {
         <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200">
           {error}
         </p>
-      ) : null}
+      ) : null} */}
 
       <CalendarContainer
         key={calendarKey}

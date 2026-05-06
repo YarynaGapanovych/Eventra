@@ -1,4 +1,4 @@
-import { fetchTasks, type ApiTask } from "@/lib/tasks-api";
+import { fetchTasks, tasksUseMocks, type ApiTask } from "@/lib/tasks-api";
 import dayjs from "dayjs";
 
 function scheduledTasks(tasks: ApiTask[]) {
@@ -107,16 +107,22 @@ export default async function AnalyticsPage() {
   const busiest = busiestDay(tasks);
   const byStatus = aggregateByStatus(tasks);
 
+  const mockMode = tasksUseMocks();
+
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          Analytics
-        </h1>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          Scheduler insights from calendar-backed tasks (frontend-only calculations).
+    <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6">
+      {mockMode ? (
+        <p
+          className="rounded-lg border border-teal-200/80 bg-teal-50/90 px-4 py-3 text-sm text-teal-900 dark:border-teal-900/60 dark:bg-teal-950/35 dark:text-teal-50"
+          role="status"
+        >
+          Sample task data (mock mode). Set{" "}
+          <code className="rounded bg-white/70 px-1 font-mono text-xs dark:bg-zinc-900/70">
+            NEXT_PUBLIC_USE_MOCK_TASKS=false
+          </code>{" "}
+          to use your API.
         </p>
-      </header>
+      ) : null}
 
       {loadError ? (
         <p

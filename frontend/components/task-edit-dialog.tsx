@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import { loadAppSettings } from "@/lib/app-settings";
 import {
   createTask,
+  isMockTaskId,
+  MOCK_TASK_ID_PREFIX,
   updateTask,
   type ApiTask,
   TASK_BOARD_STATUSES,
@@ -24,6 +26,12 @@ function datetimeLocal(iso: string) {
   return dayjs(iso).format("YYYY-MM-DDTHH:mm");
 }
 
+function progressLabelForBoardStatus(s: TaskBoardStatus): string {
+  if (s === "done") return "completed";
+  if (s === "in_progress") return "in_progress";
+  return "not_started";
+}
+
 type Mode = "create" | "edit";
 
 type Props = {
@@ -32,9 +40,19 @@ type Props = {
   task: ApiTask | null;
   onClose: () => void;
   onSaved: () => void;
+  mockPersist?: boolean;
+  onMockPersist?: (task: ApiTask) => void;
 };
 
-export function TaskEditDialog({ mode, open, task, onClose, onSaved }: Props) {
+export function TaskEditDialog({
+  mode,
+  open,
+  task,
+  onClose,
+  onSaved,
+  mockPersist = false,
+  onMockPersist,
+}: Props) {
   const [name, setName] = useState("");
   const [startLocal, setStartLocal] = useState(() => {
     const settings = loadAppSettings();
@@ -113,6 +131,52 @@ export function TaskEditDialog({ mode, open, task, onClose, onSaved }: Props) {
           setError("Invalid deadline.");
           return;
         }
+      }
+
+      if (mockPersist && mode === "create") {
+        const idSuffix =
+          typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? crypto.randomUUID()
+            : Date.now().toString(36);
+        const fresh: ApiTask = {
+          id: `${MOCK_TASK_ID_PREFIX}${idSuffix}`,
+          name: name.trim(),
+          startDate,
+          endDate,
+          progressStatus: progressLabelForBoardStatus(status),
+          status,
+          priority,
+          deadline: deadlineTrim ? dayjs(deadlineTrim).toISOString() : null,
+          scheduled: false,
+          areaId: null,
+          employees: [],
+        };
+        onMockPersist?.(fresh);
+        onClose();
+        onSaved();
+        return;
+      }
+
+      if (mockPersist && mode === "edit" && task && isMockTaskId(task.id)) {
+        const updated: ApiTask = {
+          ...task,
+          name: name.trim(),
+          startDate,
+          endDate,
+          status,
+          priority,
+          progressStatus: progressLabelForBoardStatus(status),
+        };
+        const hadDeadline = Boolean(task.deadline);
+        if (deadlineTrim) {
+          updated.deadline = dayjs(deadlineTrim).toISOString();
+        } else if (hadDeadline) {
+          updated.deadline = null;
+        }
+        onMockPersist?.(updated);
+        onClose();
+        onSaved();
+        return;
       }
 
       if (mode === "create") {
