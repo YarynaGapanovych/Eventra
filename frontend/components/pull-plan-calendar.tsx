@@ -260,8 +260,8 @@ export function PullPlanCalendar() {
         nextYearButtonContent={
           <ChevronRight className={calendarNavIconClass} aria-hidden />
         }
-        viewSwitcherClassName="flex flex-wrap gap-1 rounded-lg border border-zinc-200 bg-zinc-50 p-1 dark:border-zinc-800 dark:bg-zinc-900/50"
-        viewSwitcherButtonClassName="rounded-md px-3 py-1.5 text-sm text-zinc-600 transition-colors hover:text-zinc-900 aria-selected:bg-white aria-selected:font-medium aria-selected:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 dark:aria-selected:bg-zinc-800 dark:aria-selected:text-zinc-50"
+        viewSwitcherClassName="flex flex-wrap items-center gap-1 rounded-md border border-zinc-200/70 bg-white/70 p-1 dark:border-zinc-800 dark:bg-zinc-900/40"
+        viewSwitcherButtonClassName="rounded-md border border-transparent px-3 py-1.5 text-sm text-zinc-500 transition-colors hover:text-zinc-900 aria-selected:border-zinc-300 aria-selected:bg-white aria-selected:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 dark:aria-selected:border-zinc-700 dark:aria-selected:bg-zinc-900 dark:aria-selected:text-zinc-50"
         AddEventButton={CalendarAddEventButton}
         CreateEventModal={CalendarCreateEventModal}
         EventActionButton={CalendarEventActionButton}

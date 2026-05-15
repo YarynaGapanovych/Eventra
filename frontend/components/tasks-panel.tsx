@@ -7,13 +7,14 @@ import { Button } from "@/components/ui/button";
 import {
   fetchTasks,
   isMockTaskId,
-  tasksUseMocks,
   TASK_PRIORITY_LABELS,
   TASK_STATUS_LABELS,
+  tasksUseMocks,
   updateTask,
   type ApiTask,
   type TaskBoardStatus,
 } from "@/lib/tasks-api";
+import { cn } from "@/lib/utils";
 import { LayoutGrid, List, Plus } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -29,9 +30,7 @@ function taskMatchesQuery(task: ApiTask, q: string): boolean {
   if (TASK_STATUS_LABELS[task.status].toLowerCase().includes(n)) return true;
   if (TASK_PRIORITY_LABELS[task.priority].toLowerCase().includes(n))
     return true;
-  return task.employees.some((e) =>
-    (e.name ?? "").toLowerCase().includes(n),
-  );
+  return task.employees.some((e) => (e.name ?? "").toLowerCase().includes(n));
 }
 
 export function TasksPanel() {
@@ -101,7 +100,9 @@ export function TasksPanel() {
     setTasks((prev) => {
       const idx = prev.findIndex((t) => t.id === updated.id);
       const next =
-        idx === -1 ? [...prev, updated] : prev.map((t, i) => (i === idx ? updated : t));
+        idx === -1
+          ? [...prev, updated]
+          : prev.map((t, i) => (i === idx ? updated : t));
       return [...next].sort((a, b) => a.startDate.localeCompare(b.startDate));
     });
   }
@@ -119,15 +120,20 @@ export function TasksPanel() {
         </div> */}
         <div className="flex flex-wrap items-center gap-2">
           <div
-            className="flex rounded-lg border border-zinc-200 bg-zinc-50/80 p-1 dark:border-zinc-800 dark:bg-zinc-900/50"
+            className="flex items-center gap-1"
             role="group"
             aria-label="View layout"
           >
             <Button
               type="button"
-              variant={view === "list" ? "secondary" : "ghost"}
+              variant="ghost"
               size="sm"
-              className="gap-1.5"
+              className={cn(
+                "gap-1.5 rounded-md border border-transparent",
+                view === "list"
+                  ? "border-zinc-300 bg-white text-zinc-900 shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                  : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100",
+              )}
               onClick={() => setView("list")}
             >
               <List className="size-4" aria-hidden />
@@ -135,9 +141,14 @@ export function TasksPanel() {
             </Button>
             <Button
               type="button"
-              variant={view === "kanban" ? "secondary" : "ghost"}
+              variant="ghost"
               size="sm"
-              className="gap-1.5"
+              className={cn(
+                "gap-1.5 rounded-md border border-transparent",
+                view === "kanban"
+                  ? "border-zinc-300 bg-white text-zinc-900 shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                  : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100",
+              )}
               onClick={() => setView("kanban")}
             >
               <LayoutGrid className="size-4" aria-hidden />
@@ -161,10 +172,13 @@ export function TasksPanel() {
           className="rounded-lg border border-teal-200/80 bg-teal-50/90 px-4 py-3 text-sm text-teal-900 dark:border-teal-900/60 dark:bg-teal-950/35 dark:text-teal-50"
           role="status"
         >
-          Showing sample tasks (mock mode).
-          {" "}
+          Showing sample tasks (mock mode).{" "}
           <span className="text-teal-800/95 dark:text-teal-200/90">
-            Set <code className="rounded bg-white/70 px-1 font-mono text-xs dark:bg-zinc-900/70">NEXT_PUBLIC_USE_MOCK_TASKS=false</code> to use your API instead.
+            Set{" "}
+            <code className="rounded bg-white/70 px-1 font-mono text-xs dark:bg-zinc-900/70">
+              NEXT_PUBLIC_USE_MOCK_TASKS=false
+            </code>{" "}
+            to use your API instead.
           </span>
         </p>
       ) : null}
