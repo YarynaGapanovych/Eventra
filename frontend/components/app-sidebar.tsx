@@ -2,7 +2,6 @@
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Cormorant_Garamond } from "next/font/google";
 import {
   BarChart3,
   CalendarDays,
@@ -14,12 +13,6 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLayoutEffect, useState } from "react";
-
-const logo = Cormorant_Garamond({
-  weight: "600",
-  subsets: ["latin"],
-  display: "swap",
-});
 
 const STORAGE_KEY = "eventra.sidebar.collapsed.v1";
 
@@ -61,45 +54,19 @@ export function AppSidebar() {
   return (
     <aside
       className={cn(
-        "sticky top-0 z-40 flex h-[100dvh] shrink-0 flex-col border-r border-zinc-200/80 bg-white/92 backdrop-blur-md transition-[width] duration-200 ease-out dark:border-zinc-800 dark:bg-zinc-950/92",
-        rail ? "w-[4.25rem]" : "w-56 sm:w-[15rem]",
+        "z-40 flex min-h-0 shrink-0 flex-col self-stretch border-r border-zinc-200/80 bg-white/92 backdrop-blur-md transition-[width] duration-200 ease-out dark:border-zinc-800 dark:bg-zinc-950/92",
+        rail ? "w-17" : "w-56 sm:w-60",
       )}
       aria-label="Main navigation"
     >
-      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden p-2">
-        <Link
-          href="/calendar"
-          title="Eventra — calendar home"
-          className={cn(
-            "flex shrink-0 items-center rounded-lg text-zinc-900 transition-colors hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-900/80",
-            rail ? "mb-2 h-11 justify-center" : "mb-3 px-3 py-2.5",
-          )}
-        >
-          {rail ? (
-            <span
-              className={`${logo.className} text-lg tracking-[0.12em]`}
-              style={{ fontFeatureSettings: '"liga" 1, "kern" 1' }}
-            >
-              E
-            </span>
-          ) : (
-            <span
-              className={`${logo.className} text-xl tracking-[0.14em]`}
-              style={{ fontFeatureSettings: '"liga" 1, "kern" 1' }}
-            >
-              EVENTRA
-            </span>
-          )}
-        </Link>
-
+      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden p-2 pt-3">
         <nav
           id="app-sidebar-nav"
           className="flex flex-col gap-0.5"
           aria-label="App sections"
         >
           {navItems.map(({ href, label, Icon }) => {
-            const active =
-              pathname === href || pathname.startsWith(`${href}/`);
+            const active = pathname === href || pathname.startsWith(`${href}/`);
             return (
               <Link
                 key={href}
@@ -108,16 +75,14 @@ export function AppSidebar() {
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "flex items-center rounded-lg text-sm font-medium transition-colors",
-                  rail
-                    ? "justify-center px-2 py-2.5"
-                    : "gap-3 px-3 py-2.5",
+                  rail ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2.5",
                   active
                     ? "bg-teal-100 text-teal-900 dark:bg-teal-950/60 dark:text-teal-50"
                     : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-50",
                 )}
               >
                 <Icon
-                  className="size-[1.125rem] shrink-0 opacity-90"
+                  className="size-5 shrink-0 opacity-90"
                   strokeWidth={2}
                   aria-hidden
                 />

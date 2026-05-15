@@ -1,4 +1,5 @@
-import { API_BASE } from "@/lib/tasks-api";
+import { graphqlRequest } from "@/lib/graphql";
+import { LOGIN_MUTATION, REGISTER_MUTATION } from "@/lib/graphql/mutations";
 
 export const AUTH_STORAGE_KEY = "eventra.auth.v1";
 
@@ -11,6 +12,11 @@ export type AuthUser = {
 export type StoredAuth = {
   token: string;
   user: AuthUser;
+};
+
+type AuthPayloadResponse = {
+  login?: { accessToken: string; user: AuthUser };
+  register?: { accessToken: string; user: AuthUser };
 };
 
 export function getStoredAuth(): StoredAuth | null {
@@ -53,57 +59,26 @@ export async function apiRegister(body: {
   password: string;
   name?: string;
 }): Promise<StoredAuth> {
-  const res = await fetch(`${API_BASE}/auth/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+  const data = await graphqlRequest<AuthPayloadResponse>(REGISTER_MUTATION, {
+    input: body,
   });
-  const text = await res.text();
-  if (!res.ok) {
-    let msg = text?.trim() ? text.slice(0, 400) : `Register failed (${res.status})`;
-    try {
-      const j = JSON.parse(text) as { message?: string | string[] };
-      if (Array.isArray(j.message)) msg = j.message.join(", ");
-      else if (typeof j.message === "string") msg = j.message;
-    } catch {
-      /* keep msg from body or default */
-    }
-    throw new Error(msg);
+  const payload = data.register;
+  if (!payload) {
+    throw new Error("Register failed");
   }
-  const data = JSON.parse(text) as {
-    accessToken: string;
-    user: AuthUser;
-  };
-  const auth = { token: data.accessToken, user: data.user };
-  setStoredAuth(auth);
-  return auth;
+  return { token: payload.accessToken, user: payload.user };
 }
 
 export async function apiLogin(
   email: string,
   password: string,
 ): Promise<StoredAuth> {
-  const res = await fetch(`${API_BASE}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
+  const data = await graphqlRequest<AuthPayloadResponse>(LOGIN_MUTATION, {
+    input: { email, password },
   });
-  const text = await res.text();
-  if (!res.ok) {
-    let msg = "Invalid email or password";
-    try {
-      const j = JSON.parse(text) as { message?: string };
-      if (typeof j.message === "string") msg = j.message;
-    } catch {
-      if (text?.trim()) msg = text.slice(0, 400);
-    }
-    throw new Error(msg);
+  const payload = data.login;
+  if (!payload) {
+    throw new Error("Invalid email or password");
   }
-  const data = JSON.parse(text) as {
-    accessToken: string;
-    user: AuthUser;
-  };
-  const auth = { token: data.accessToken, user: data.user };
-  setStoredAuth(auth);
-  return auth;
+  return { token: payload.accessToken, user: payload.user };
 }

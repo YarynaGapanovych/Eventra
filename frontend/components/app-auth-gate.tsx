@@ -1,6 +1,6 @@
 "use client";
 
-import { getStoredAuth } from "@/lib/auth-api";
+import { useAuthStore } from "@/stores/auth-store";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -12,22 +12,22 @@ export const APP_AUTH_GATE_DISABLED = true;
 
 export function AppAuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const hydrated = useAuthStore((s) => s.hydrated);
+  const token = useAuthStore((s) => s.token);
   const [allowed, setAllowed] = useState(() => APP_AUTH_GATE_DISABLED);
 
   useEffect(() => {
     if (APP_AUTH_GATE_DISABLED) return;
+    if (!hydrated) return;
 
-    /* eslint-disable react-hooks/set-state-in-effect -- Auth gate reads localStorage then allows render */
-    const auth = getStoredAuth();
-    if (!auth?.token) {
+    if (!token) {
       router.replace("/");
       return;
     }
     setAllowed(true);
-    /* eslint-enable react-hooks/set-state-in-effect */
-  }, [router]);
+  }, [hydrated, token, router]);
 
-  if (!APP_AUTH_GATE_DISABLED && !allowed) {
+  if (!APP_AUTH_GATE_DISABLED && (!hydrated || !allowed)) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-sm text-zinc-600 dark:text-zinc-400">
         <p>Checking session…</p>

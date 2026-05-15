@@ -1,18 +1,12 @@
 "use client";
 
 import { APP_AUTH_GATE_DISABLED } from "@/components/app-auth-gate";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
-import { apiLogin, apiRegister, getStoredAuth } from "@/lib/auth-api";
+import { LoginForm } from "@/components/login-form";
+import { RegisterForm } from "@/components/register-form";
+import { useAuthStore } from "@/stores/auth-store";
+import { CalendarDays, Clock3, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
-import {
-  useCallback,
-  useEffect,
-  useState,
-  type FormEvent,
-} from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type Mode = "login" | "register";
 
@@ -20,183 +14,85 @@ export function HomeAuth() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("login");
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   const goApp = useCallback(() => router.replace("/calendar"), [router]);
+  const hydrated = useAuthStore((s) => s.hydrated);
+  const token = useAuthStore((s) => s.token);
 
   useEffect(() => {
     if (APP_AUTH_GATE_DISABLED) return;
-    if (getStoredAuth()?.token) void goApp();
-  }, [goApp]);
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-
-    const em = email.trim();
-    const pw = password;
-    if (!em || !pw) {
-      setError("Enter email and password.");
-      return;
-    }
-
-    if (mode === "register") {
-      if (pw.length < 8) {
-        setError("Password must be at least 8 characters.");
-        return;
-      }
-      if (pw !== confirm) {
-        setError("Passwords do not match.");
-        return;
-      }
-    }
-
-    setPending(true);
-    try {
-      if (mode === "login") {
-        await apiLogin(em, pw);
-      } else {
-        await apiRegister({
-          email: em,
-          password: pw,
-          name: name.trim() || undefined,
-        });
-      }
-      goApp();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
-    } finally {
-      setPending(false);
-    }
-  }
+    if (!hydrated) return;
+    if (token) void goApp();
+  }, [goApp, hydrated, token]);
 
   return (
-    <div className="w-full max-w-md">
-      <div className="mb-8 space-y-2 text-center sm:text-left">
-        <p className="font-semibold uppercase tracking-[0.2em] text-teal-700 dark:text-teal-400">
-          Eventra
-        </p>
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          Schedule work together
-        </h1>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Sign in to open your calendar and tasks.
-        </p>
+    <main className="grid h-screen w-full md:grid-cols-2 md:items-stretch">
+      <div className="relative overflow-hidden bg-black pl-16 pr-8 pt-12 pb-14 text-left md:pl-12 md:pr-8 md:pt-14 md:pb-16 lg:pl-16 lg:pr-12 lg:pt-16 lg:pb-18">
+        <div className="pointer-events-none absolute -left-12 top-8 h-72 w-72 rounded-full border border-teal-700/35" />
+        <div className="pointer-events-none absolute -right-30 top-28 h-132 w-132 rounded-full border border-teal-700/30" />
+        <div className="pointer-events-none absolute -right-20 -bottom-28 h-96 w-96 rounded-full border border-teal-700/24" />
+        <div className="pointer-events-none absolute left-28 -top-10 h-56 w-56 rounded-full border border-teal-600/28" />
+        <div className="pointer-events-none absolute -left-24 bottom-14 h-80 w-80 rounded-full border border-teal-800/30" />
+        <div className="pointer-events-none absolute right-20 top-10 h-40 w-40 rounded-full border border-teal-500/24" />
+        <div className="pointer-events-none absolute left-44 bottom-16 h-52 w-52 rounded-full border border-teal-600/24" />
+        <div className="pointer-events-none absolute -right-8 bottom-44 h-64 w-64 rounded-full border border-teal-700/24" />
+        <div className="pointer-events-none absolute right-32 -bottom-8 h-44 w-44 rounded-full border border-teal-500/20" />
+
+        <div className="relative z-10">
+          <p className="text-3xl font-semibold leading-none uppercase tracking-[0.08em] text-teal-600 md:text-4xl lg:text-5xl">
+            Eventra
+          </p>
+          <div className="mt-[28%] flex flex-col gap-14">
+            <h1 className=" text-5xl font-semibold leading-[0.95] tracking-tight text-balance text-zinc-100  md:text-6xl  lg:text-7xl">
+              Schedule work together
+            </h1>
+            <p className="text-lg leading-relaxed text-zinc-400  md:text-xl lg:text-2xl">
+              Coordinate seamlessly with your team. Manage calendars, tasks, and
+              meetings in one unified workspace.
+            </p>
+
+            <ul className=" space-y-4   lg:space-y-5">
+              <li className="flex items-center gap-4 lg:gap-5">
+                <span className="inline-flex size-12 items-center justify-center rounded-2xl border border-teal-900/45 bg-teal-950/25 text-teal-600 lg:size-14">
+                  <CalendarDays className="size-6 lg:size-7" aria-hidden />
+                </span>
+                <span className="text-lg leading-tight text-zinc-300 md:text-xl lg:text-2xl">
+                  Smart calendar scheduling
+                </span>
+              </li>
+              <li className="flex items-center gap-4 lg:gap-5">
+                <span className="inline-flex size-12 items-center justify-center rounded-2xl border border-teal-900/45 bg-teal-950/25 text-teal-600 lg:size-14">
+                  <Users className="size-6 lg:size-7" aria-hidden />
+                </span>
+                <span className="text-lg leading-tight text-zinc-300 md:text-xl lg:text-2xl">
+                  Team collaboration tools
+                </span>
+              </li>
+              <li className="flex items-center gap-4 lg:gap-5">
+                <span className="inline-flex size-12 items-center justify-center rounded-2xl border border-teal-900/45 bg-teal-950/25 text-teal-600 lg:size-14">
+                  <Clock3 className="size-6 lg:size-7" aria-hidden />
+                </span>
+                <span className="text-lg leading-tight text-zinc-300 md:text-xl lg:text-2xl">
+                  Real-time availability sync
+                </span>
+              </li>
+            </ul>
+          </div>
+        </div>
       </div>
 
-      <div
-        className="mb-6 flex rounded-lg border border-zinc-200 bg-zinc-50/80 p-1 dark:border-zinc-800 dark:bg-zinc-900/60"
-        role="tablist"
-      >
-        {(["login", "register"] as const).map((m) => (
-          <button
-            key={m}
-            type="button"
-            role="tab"
-            aria-selected={mode === m}
-            className={cn(
-              "flex-1 rounded-md px-3 py-2 text-sm font-medium capitalize transition-colors",
-              mode === m
-                ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-950 dark:text-zinc-50"
-                : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100",
-            )}
-            onClick={() => {
-              setMode(m);
-              setError(null);
-            }}
-          >
-            {m === "login" ? "Sign in" : "Create account"}
-          </button>
-        ))}
+      <div className="relative overflow-hidden  bg-zinc-50/95 p-7 dark:bg-zinc-950/85">
+        {mode === "login" ? (
+          <LoginForm
+            onSuccess={goApp}
+            onRequestRegister={() => setMode("register")}
+          />
+        ) : (
+          <RegisterForm
+            onSuccess={goApp}
+            onRequestLogin={() => setMode("login")}
+          />
+        )}
       </div>
-
-      <form
-        className="space-y-4 rounded-xl border border-zinc-200/90 bg-white/90 p-6 shadow-lg dark:border-zinc-800 dark:bg-zinc-950/85"
-        onSubmit={(ev) => void submit(ev)}
-      >
-        {mode === "register" ? (
-          <div className="space-y-2">
-            <Label htmlFor="reg-name">Name (optional)</Label>
-            <Input
-              id="reg-name"
-              type="text"
-              autoComplete="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your name"
-            />
-          </div>
-        ) : null}
-
-        <div className="space-y-2">
-          <Label htmlFor="auth-email">Email</Label>
-          <Input
-            id="auth-email"
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@company.com"
-            required
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="auth-password">Password</Label>
-          <Input
-            id="auth-password"
-            type="password"
-            autoComplete={mode === "login" ? "current-password" : "new-password"}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            placeholder={
-              mode === "register" ? "At least 8 characters" : undefined
-            }
-          />
-        </div>
-
-        {mode === "register" ? (
-          <div className="space-y-2">
-            <Label htmlFor="auth-confirm">Confirm password</Label>
-            <Input
-              id="auth-confirm"
-              type="password"
-              autoComplete="new-password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              required
-            />
-          </div>
-        ) : null}
-
-        {error ? (
-          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-        ) : null}
-
-        <Button
-          type="submit"
-          className="w-full bg-teal-600 text-white hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600"
-          disabled={pending}
-        >
-          {pending
-            ? "Please wait…"
-            : mode === "login"
-              ? "Sign in"
-              : "Create account"}
-        </Button>
-      </form>
-
-      <p className="mt-6 text-center text-xs text-zinc-500 dark:text-zinc-500">
-        Requires the Nest API running (defaults to{" "}
-        <span className="font-mono">http://localhost:3001</span> unless{" "}
-        <span className="font-mono">NEXT_PUBLIC_API_URL</span> is set).
-      </p>
-    </div>
+    </main>
   );
 }

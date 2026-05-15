@@ -8,13 +8,13 @@ export default function AppLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="flex min-h-full flex-1 bg-linear-to-br from-zinc-100 via-white to-teal-50/40 dark:from-zinc-950 dark:via-zinc-950 dark:to-teal-950/20">
-      <AppSidebar />
+    <div className="flex min-h-full flex-1 flex-col bg-linear-to-br from-zinc-100 via-white to-teal-50/40 dark:from-zinc-950 dark:via-zinc-950 dark:to-teal-950/20">
+      <SiteHeader />
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <SiteHeader />
+      <div className="flex min-h-0 min-w-0 flex-1">
+        <AppSidebar />
 
-        <main className="flex min-h-0 flex-1 flex-col p-4 sm:p-6 md:p-8">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col p-4 sm:p-6 md:p-8">
           <AppAuthGate>{children}</AppAuthGate>
         </main>
       </div>

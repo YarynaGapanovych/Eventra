@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TaskBoardStatus {
+  todo
+  in_progress
+  done
+}
+
+enum TaskPriority {
+  low
+  medium
+  high
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Task {
+  id             String           @id @default(cuid())
+  name           String
+  startDate      DateTime
+  endDate        DateTime
+  progressStatus String           @default("not_started")
+  status         TaskBoardStatus  @default(todo)
+  priority       TaskPriority     @default(medium)
+  deadline       DateTime?
+  scheduled      Boolean          @default(false)
+  areaId         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
