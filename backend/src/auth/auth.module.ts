@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { AuthResolver } from './auth.resolver';
 import { AuthService } from './auth.service';
+import { GoogleAuthController } from './google-auth.controller';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { AuthService } from './auth.service';
       inject: [ConfigService],
     }),
   ],
+  controllers: [GoogleAuthController],
   providers: [AuthService, AuthResolver],
   exports: [AuthService, JwtModule],
 })
