@@ -1,5 +1,6 @@
 "use client";
 
+import { GoogleCalendarSyncSection } from "@/components/google-calendar-sync-section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -235,6 +236,8 @@ export function SettingsPanel() {
             ) : null}
           </div>
         </section>
+
+        <GoogleCalendarSyncSection />
 
         <div className="flex flex-wrap items-center gap-3">
           <Button type="submit" disabled={invalidRange}>

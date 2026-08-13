@@ -54,8 +54,8 @@ export function AppSidebar() {
   return (
     <aside
       className={cn(
-        "z-40 flex min-h-0 shrink-0 flex-col self-stretch border-r border-zinc-200/80 bg-white/92 backdrop-blur-md transition-[width] duration-200 ease-out dark:border-zinc-800 dark:bg-zinc-950/92",
-        rail ? "w-17" : "w-56 sm:w-60",
+        "flex min-h-0 flex-col overflow-hidden border-r border-zinc-200/80 bg-white/92 backdrop-blur-md transition-[width] duration-200 ease-out dark:border-zinc-800 dark:bg-zinc-950/92",
+        rail ? "w-16" : "w-56 sm:w-60",
       )}
       aria-label="Main navigation"
     >
@@ -74,7 +74,7 @@ export function AppSidebar() {
                 title={rail ? label : undefined}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex items-center rounded-lg text-sm font-medium transition-colors",
+                  "flex w-full items-center rounded-lg text-sm font-medium transition-colors",
                   rail ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2.5",
                   active
                     ? "bg-teal-100 text-teal-900 dark:bg-teal-950/60 dark:text-teal-50"

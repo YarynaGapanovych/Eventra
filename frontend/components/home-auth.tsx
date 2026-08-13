@@ -5,14 +5,20 @@ import { LoginForm } from "@/components/login-form";
 import { RegisterForm } from "@/components/register-form";
 import { useAuthStore } from "@/stores/auth-store";
 import { CalendarDays, Clock3, Users } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
 
 type Mode = "login" | "register";
 
-export function HomeAuth() {
+function HomeAuthContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [mode, setMode] = useState<Mode>("login");
+
+  const googleAuthError =
+    searchParams.get("google_auth") === "error"
+      ? searchParams.get("message")?.trim() || "Google sign-in failed."
+      : null;
 
   const goApp = useCallback(() => router.replace("/calendar"), [router]);
   const hydrated = useAuthStore((s) => s.hydrated);
@@ -81,6 +87,11 @@ export function HomeAuth() {
       </div>
 
       <div className="relative overflow-hidden  bg-zinc-50/95 p-7 dark:bg-zinc-950/85">
+        {googleAuthError ? (
+          <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
+            {googleAuthError}
+          </p>
+        ) : null}
         {mode === "login" ? (
           <LoginForm
             onSuccess={goApp}
@@ -94,5 +105,13 @@ export function HomeAuth() {
         )}
       </div>
     </main>
+  );
+}
+
+export function HomeAuth() {
+  return (
+    <Suspense fallback={null}>
+      <HomeAuthContent />
+    </Suspense>
   );
 }
