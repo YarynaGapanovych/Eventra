@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useLoginMutation } from "@/hooks/use-auth-mutations";
+import { startGoogleLogin } from "@/lib/google-auth";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight } from "lucide-react";
 import Image from "next/image";
@@ -139,6 +140,7 @@ export function LoginForm({ onSuccess, onRequestRegister }: LoginFormProps) {
           type="button"
           variant="outline"
           className="h-13 w-full rounded-xl border-zinc-300 bg-white text-lg text-zinc-800 shadow-sm hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+          onClick={() => startGoogleLogin()}
         >
           <Image src="/icons8-google.svg" alt="Google" width={18} height={18} />
           Google
