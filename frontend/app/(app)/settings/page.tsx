@@ -1,7 +1,7 @@
 "use client";
 
 import { SettingsPanel } from "@/components/settings-panel";
-import { markGoogleCalendarConnected } from "@/lib/google-calendar-sync";
+import { GOOGLE_CALENDAR_SYNC_CHANGED_EVENT } from "@/lib/google-calendar-sync";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
 
@@ -13,8 +13,8 @@ function SettingsPageContent() {
     const status = searchParams.get("google_calendar");
     if (!status) return;
 
-    if (status === "connected" || status === "callback") {
-      markGoogleCalendarConnected();
+    if (status === "connected") {
+      window.dispatchEvent(new Event(GOOGLE_CALENDAR_SYNC_CHANGED_EVENT));
     }
 
     const next = new URLSearchParams(searchParams.toString());
