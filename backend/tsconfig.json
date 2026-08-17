@@ -20,9 +20,8 @@
     "resolveJsonModule": true,
     "strict": true,
     "moduleResolution": "node",
-    "rootDir": ".",
-    "baseUrl": "./"
+    "rootDir": "./src"
   },
-  "include": ["src/**/*.ts", "prisma/**/*.ts"],
+  "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "test"]
 }

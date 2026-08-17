@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import {
   durationChoices,
   getAppSettingsPlaceholder,
-  getDefaultTimezone,
   listTimezones,
   loadAppSettings,
   normalizeSettingsPartial,
@@ -17,7 +16,7 @@ import {
 } from "@/lib/app-settings";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod/v3";
 
@@ -66,7 +65,7 @@ function emitSettingsSaved(settings: AppSettings) {
 }
 
 export function SettingsPanel() {
-  const zones = useMemo(() => listTimezones(), []);
+  const [zones, setZones] = useState<string[]>([]);
   const [savedPulse, setSavedPulse] = useState(false);
 
   const form = useForm<SettingsFormValues>({
@@ -82,7 +81,6 @@ export function SettingsPanel() {
     name: "workdayStart",
   });
   const workdayEnd = useWatch({ control: form.control, name: "workdayEnd" });
-  const timezone = useWatch({ control: form.control, name: "timezone" });
   const defaultEventDurationMinutes = useWatch({
     control: form.control,
     name: "defaultEventDurationMinutes",
@@ -91,6 +89,10 @@ export function SettingsPanel() {
   useLayoutEffect(() => {
     reset(loadAppSettings());
   }, [reset]);
+
+  useEffect(() => {
+    setZones(listTimezones());
+  }, []);
 
   const durationOpts = useMemo(() => {
     const base = [...durationChoices()];
@@ -182,7 +184,7 @@ export function SettingsPanel() {
               list="iana-timezones"
               autoComplete="off"
               className="font-mono text-sm"
-              placeholder={getDefaultTimezone()}
+              placeholder="e.g. Europe/Warsaw"
               aria-invalid={!!formState.errors.timezone}
               {...register("timezone")}
             />
@@ -191,11 +193,13 @@ export function SettingsPanel() {
                 {formState.errors.timezone.message}
               </p>
             ) : null}
-            <datalist id="iana-timezones">
-              {zones.map((z) => (
-                <option key={z} value={z} />
-              ))}
-            </datalist>
+            {zones.length > 0 ? (
+              <datalist id="iana-timezones">
+                {zones.map((z) => (
+                  <option key={z} value={z} />
+                ))}
+              </datalist>
+            ) : null}
           </div>
         </section>
 
@@ -237,7 +241,20 @@ export function SettingsPanel() {
           </div>
         </section>
 
-        <GoogleCalendarSyncSection />
+        <Suspense
+          fallback={
+            <section className="rounded-xl border border-zinc-200/80 bg-white/80 p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950/60">
+              <h2 className="text-md font-semibold text-zinc-900 dark:text-zinc-50">
+                Google Calendar
+              </h2>
+              <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
+                Loading connection status…
+              </p>
+            </section>
+          }
+        >
+          <GoogleCalendarSyncSection />
+        </Suspense>
 
         <div className="flex flex-wrap items-center gap-3">
           <Button type="submit" disabled={invalidRange}>

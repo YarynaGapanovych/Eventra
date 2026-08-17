@@ -149,6 +149,7 @@ export function TaskEditDialog({
           deadline: deadlineTrim ? dayjs(deadlineTrim).toISOString() : null,
           scheduled: false,
           areaId: null,
+          source: "eventra",
           employees: [],
         };
         onMockPersist?.(fresh);
