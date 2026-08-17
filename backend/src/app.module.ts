@@ -3,10 +3,11 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { GraphQLModule } from '@nestjs/graphql';
 import { join } from 'path';
-import { PrismaModule } from '../prisma/prisma.module';
+import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { RootResolver } from './root.resolver';
+import { TasksModule } from './tasks/tasks.module';
 
 const isProd = process.env.NODE_ENV === 'production';
 
@@ -24,6 +25,7 @@ const isProd = process.env.NODE_ENV === 'production';
     PrismaModule,
     AuthModule,
     IntegrationsModule,
+    TasksModule,
   ],
   providers: [RootResolver],
 })
