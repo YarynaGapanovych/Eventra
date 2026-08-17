@@ -13,6 +13,7 @@ export type ApiTaskDto = {
   deadline: string | null;
   scheduled: boolean;
   areaId: string | null;
+  source: string;
   employees: { id: string; name: string | null }[];
 };
 
@@ -40,6 +41,7 @@ export class TasksService {
       deadline: task.deadline?.toISOString() ?? null,
       scheduled: task.scheduled,
       areaId: task.areaId,
+      source: task.source,
       employees: [],
     };
   }

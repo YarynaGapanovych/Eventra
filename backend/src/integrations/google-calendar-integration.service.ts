@@ -2,6 +2,10 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { TaskSource } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  DEFAULT_SYNC_DAYS_BACK,
+  DEFAULT_SYNC_DAYS_FORWARD,
+} from './google-calendar-sync-window';
+import {
   GoogleOAuthService,
   type GoogleOAuthTokens,
 } from './google-oauth.service';
@@ -10,6 +14,8 @@ export type GoogleCalendarConnectionStatus = {
   connected: boolean;
   connectedAt: string | null;
   lastSyncedAt: string | null;
+  syncDaysBack: number;
+  syncDaysForward: number;
 };
 
 @Injectable()
@@ -24,13 +30,56 @@ export class GoogleCalendarIntegrationService {
       where: { userId },
     });
     if (!row) {
-      return { connected: false, connectedAt: null, lastSyncedAt: null };
+      return {
+        connected: false,
+        connectedAt: null,
+        lastSyncedAt: null,
+        syncDaysBack: DEFAULT_SYNC_DAYS_BACK,
+        syncDaysForward: DEFAULT_SYNC_DAYS_FORWARD,
+      };
     }
     return {
       connected: true,
       connectedAt: row.connectedAt.toISOString(),
       lastSyncedAt: row.lastSyncedAt?.toISOString() ?? null,
+      syncDaysBack: row.syncDaysBack,
+      syncDaysForward: row.syncDaysForward,
     };
+  }
+
+  async getSyncWindow(
+    userId: string,
+  ): Promise<{ syncDaysBack: number; syncDaysForward: number }> {
+    const row = await this.prisma.googleCalendarIntegration.findUnique({
+      where: { userId },
+    });
+    if (!row) {
+      throw new BadRequestException('Google Calendar is not connected');
+    }
+    return {
+      syncDaysBack: row.syncDaysBack,
+      syncDaysForward: row.syncDaysForward,
+    };
+  }
+
+  async updateSyncWindow(
+    userId: string,
+    syncDaysBack: number,
+    syncDaysForward: number,
+  ): Promise<GoogleCalendarConnectionStatus> {
+    const row = await this.prisma.googleCalendarIntegration.findUnique({
+      where: { userId },
+    });
+    if (!row) {
+      throw new BadRequestException('Google Calendar is not connected');
+    }
+
+    await this.prisma.googleCalendarIntegration.update({
+      where: { userId },
+      data: { syncDaysBack, syncDaysForward },
+    });
+
+    return this.getStatus(userId);
   }
 
   async getValidAccessToken(userId: string): Promise<string> {

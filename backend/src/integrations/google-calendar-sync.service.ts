@@ -13,6 +13,7 @@ type GoogleCalendarEvent = {
 
 type GoogleEventsListResponse = {
   items?: GoogleCalendarEvent[];
+  nextPageToken?: string;
   error?: { message?: string };
 };
 
@@ -23,8 +24,8 @@ export type GoogleCalendarSyncResult = {
 
 @Injectable()
 export class GoogleCalendarSyncService {
-  private static readonly SYNC_DAYS_BACK = 30;
-  private static readonly SYNC_DAYS_FORWARD = 90;
+  private static readonly PAGE_SIZE = 250;
+  private static readonly MAX_PAGES = 40;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -34,13 +35,13 @@ export class GoogleCalendarSyncService {
   async syncForUser(userId: string): Promise<GoogleCalendarSyncResult> {
     const accessToken =
       await this.integrationService.getValidAccessToken(userId);
+    const { syncDaysBack, syncDaysForward } =
+      await this.integrationService.getSyncWindow(userId);
 
     const timeMin = new Date();
-    timeMin.setDate(timeMin.getDate() - GoogleCalendarSyncService.SYNC_DAYS_BACK);
+    timeMin.setDate(timeMin.getDate() - syncDaysBack);
     const timeMax = new Date();
-    timeMax.setDate(
-      timeMax.getDate() + GoogleCalendarSyncService.SYNC_DAYS_FORWARD,
-    );
+    timeMax.setDate(timeMax.getDate() + syncDaysForward);
 
     const events = await this.fetchPrimaryCalendarEvents(
       accessToken,
@@ -48,12 +49,14 @@ export class GoogleCalendarSyncService {
       timeMax,
     );
 
+    const seenIds = new Set<string>();
     let imported = 0;
     for (const event of events) {
       if (!event.id || event.status === 'cancelled') continue;
       const mapped = this.mapEventToTask(userId, event);
       if (!mapped) continue;
 
+      seenIds.add(event.id);
       await this.prisma.task.upsert({
         where: {
           userId_googleEventId: {
@@ -73,6 +76,9 @@ export class GoogleCalendarSyncService {
       imported += 1;
     }
 
+    await this.pruneMissingGoogleTasks(userId, timeMin, timeMax, seenIds);
+    await this.pruneGoogleTasksOutsideWindow(userId, timeMin, timeMax);
+
     const syncedAt = new Date();
     await this.prisma.googleCalendarIntegration.update({
       where: { userId },
@@ -87,27 +93,76 @@ export class GoogleCalendarSyncService {
     timeMin: Date,
     timeMax: Date,
   ): Promise<GoogleCalendarEvent[]> {
-    const params = new URLSearchParams({
-      singleEvents: 'true',
-      orderBy: 'startTime',
-      timeMin: timeMin.toISOString(),
-      timeMax: timeMax.toISOString(),
-      maxResults: '250',
-    });
+    const items: GoogleCalendarEvent[] = [];
+    let pageToken: string | undefined;
 
-    const res = await fetch(
-      `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params.toString()}`,
-      { headers: { Authorization: `Bearer ${accessToken}` } },
-    );
+    for (let page = 0; page < GoogleCalendarSyncService.MAX_PAGES; page += 1) {
+      const params = new URLSearchParams({
+        singleEvents: 'true',
+        orderBy: 'startTime',
+        timeMin: timeMin.toISOString(),
+        timeMax: timeMax.toISOString(),
+        maxResults: String(GoogleCalendarSyncService.PAGE_SIZE),
+      });
+      if (pageToken) params.set('pageToken', pageToken);
 
-    const data = (await res.json()) as GoogleEventsListResponse;
-    if (!res.ok) {
-      throw new BadRequestException(
-        data.error?.message ?? 'Failed to fetch Google Calendar events',
+      const res = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params.toString()}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
       );
+
+      const data = (await res.json()) as GoogleEventsListResponse;
+      if (!res.ok) {
+        throw new BadRequestException(
+          data.error?.message ?? 'Failed to fetch Google Calendar events',
+        );
+      }
+
+      items.push(...(data.items ?? []));
+      pageToken = data.nextPageToken?.trim() || undefined;
+      if (!pageToken) break;
     }
 
-    return data.items ?? [];
+    return items;
+  }
+
+  private async pruneMissingGoogleTasks(
+    userId: string,
+    timeMin: Date,
+    timeMax: Date,
+    seenIds: Set<string>,
+  ): Promise<void> {
+    const windowFilter = {
+      userId,
+      source: TaskSource.google,
+      startDate: { gte: timeMin, lte: timeMax },
+    };
+
+    if (seenIds.size === 0) {
+      await this.prisma.task.deleteMany({ where: windowFilter });
+      return;
+    }
+
+    await this.prisma.task.deleteMany({
+      where: {
+        ...windowFilter,
+        googleEventId: { notIn: [...seenIds] },
+      },
+    });
+  }
+
+  private async pruneGoogleTasksOutsideWindow(
+    userId: string,
+    timeMin: Date,
+    timeMax: Date,
+  ): Promise<void> {
+    await this.prisma.task.deleteMany({
+      where: {
+        userId,
+        source: TaskSource.google,
+        OR: [{ startDate: { lt: timeMin } }, { startDate: { gt: timeMax } }],
+      },
+    });
   }
 
   private mapEventToTask(

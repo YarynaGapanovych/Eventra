@@ -4,6 +4,8 @@ import {
   Controller,
   Get,
   Headers,
+  Logger,
+  Patch,
   Post,
   Query,
   Res,
@@ -14,6 +16,10 @@ import { JwtService } from '@nestjs/jwt';
 import type { Response } from 'express';
 import { GoogleCalendarIntegrationService } from './google-calendar-integration.service';
 import { GoogleCalendarSyncService } from './google-calendar-sync.service';
+import {
+  clampSyncDaysBack,
+  clampSyncDaysForward,
+} from './google-calendar-sync-window';
 import { GoogleOAuthService } from './google-oauth.service';
 
 const DEFAULT_FRONTEND_REDIRECT =
@@ -26,6 +32,8 @@ const ALLOWED_REDIRECT_ORIGINS = new Set([
 
 @Controller('integrations/google-calendar')
 export class GoogleCalendarController {
+  private readonly logger = new Logger(GoogleCalendarController.name);
+
   constructor(
     private readonly config: ConfigService,
     private readonly jwtService: JwtService,
@@ -148,6 +156,15 @@ export class GoogleCalendarController {
         this.googleOAuth.getCalendarCallbackUri(),
       );
       await this.integrationService.upsertFromOAuthTokens(userId, tokens);
+      try {
+        await this.syncService.syncForUser(userId);
+      } catch (syncErr) {
+        this.logger.warn(
+          `Google Calendar connected for ${userId} but initial sync failed: ${
+            syncErr instanceof Error ? syncErr.message : String(syncErr)
+          }`,
+        );
+      }
       url.searchParams.set('google_calendar', 'connected');
       res.redirect(url.toString());
     } catch (err) {
@@ -178,6 +195,19 @@ export class GoogleCalendarController {
     const userId = this.requireUserId(authorization);
     const result = await this.syncService.syncForUser(userId);
     return { ok: true, syncedAt: result.syncedAt, imported: result.imported };
+  }
+
+  @Patch('sync-window')
+  async updateSyncWindow(
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body?: { syncDaysBack?: number; syncDaysForward?: number },
+  ) {
+    const userId = this.requireUserId(authorization);
+    return this.integrationService.updateSyncWindow(
+      userId,
+      clampSyncDaysBack(body?.syncDaysBack),
+      clampSyncDaysForward(body?.syncDaysForward),
+    );
   }
 
   private requireUserId(authorization?: string): string {

@@ -1,7 +1,7 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
-
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
 }
 
 datasource db {
@@ -47,6 +47,8 @@ model GoogleCalendarIntegration {
   accessTokenExpiresAt  DateTime?
   connectedAt           DateTime  @default(now())
   lastSyncedAt          DateTime?
+  syncDaysBack          Int       @default(30)
+  syncDaysForward       Int       @default(90)
   updatedAt             DateTime  @updatedAt
 }
 

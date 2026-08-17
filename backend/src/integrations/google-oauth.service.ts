@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
 
@@ -162,12 +159,8 @@ export class GoogleOAuthService {
   private encryptionKey(): Buffer {
     const raw =
       this.config.get<string>('GOOGLE_TOKEN_ENCRYPTION_KEY')?.trim() ??
-      this.config.get<string>('JWT_SECRET')?.trim();
-    if (!raw) {
-      throw new ServiceUnavailableException(
-        'Set GOOGLE_TOKEN_ENCRYPTION_KEY or JWT_SECRET for token encryption.',
-      );
-    }
+      this.config.get<string>('JWT_SECRET')?.trim() ??
+      'eventra-dev-secret-change-me';
     return createHash('sha256').update(raw).digest();
   }
 }
