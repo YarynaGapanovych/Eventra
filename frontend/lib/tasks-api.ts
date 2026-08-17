@@ -1,6 +1,7 @@
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
+import { getStoredAuth } from "@/lib/auth-api";
 import {
   buildMockTasks,
   isMockTaskId,
@@ -15,6 +16,11 @@ export function tasksUseMocks(): boolean {
   if (v === "0" || v === "false") return false;
   if (v === "1" || v === "true") return true;
   return process.env.NODE_ENV === "development";
+}
+
+function taskAuthHeaders(): HeadersInit {
+  const token = getStoredAuth()?.token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 export const TASK_BOARD_STATUSES = ["todo", "in_progress", "done"] as const;
@@ -53,7 +59,10 @@ export async function fetchTasks(): Promise<ApiTask[]> {
   if (tasksUseMocks()) {
     return buildMockTasks();
   }
-  const res = await fetch(`${API_BASE}/tasks`, { cache: "no-store" });
+  const res = await fetch(`${API_BASE}/tasks`, {
+    cache: "no-store",
+    headers: taskAuthHeaders(),
+  });
   if (!res.ok) {
     throw new Error(`GET /tasks failed: ${res.status}`);
   }
@@ -70,7 +79,7 @@ export async function createTask(body: {
 }): Promise<{ id: string; status: string }> {
   const res = await fetch(`${API_BASE}/tasks`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...taskAuthHeaders() },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -92,7 +101,7 @@ export async function updateTask(
 ): Promise<ApiTask> {
   const res = await fetch(`${API_BASE}/tasks/${encodeURIComponent(id)}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...taskAuthHeaders() },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
