@@ -3,16 +3,26 @@ import { API_BASE } from "@/lib/tasks-api";
 export const GOOGLE_CALENDAR_SYNC_CHANGED_EVENT =
   "eventra-google-calendar-changed";
 
+export const DEFAULT_SYNC_DAYS_BACK = 30;
+export const DEFAULT_SYNC_DAYS_FORWARD = 90;
+
+export const SYNC_DAYS_BACK_PRESETS = [7, 14, 30, 90, 180, 365] as const;
+export const SYNC_DAYS_FORWARD_PRESETS = [30, 90, 180, 365] as const;
+
 export type GoogleCalendarSyncState = {
   connected: boolean;
   connectedAt: string | null;
   lastSyncedAt: string | null;
+  syncDaysBack: number;
+  syncDaysForward: number;
 };
 
 const DEFAULT_STATE: GoogleCalendarSyncState = {
   connected: false,
   connectedAt: null,
   lastSyncedAt: null,
+  syncDaysBack: DEFAULT_SYNC_DAYS_BACK,
+  syncDaysForward: DEFAULT_SYNC_DAYS_FORWARD,
 };
 
 function notifyChanged() {
@@ -24,6 +34,15 @@ function authHeaders(accessToken: string): HeadersInit {
   return { Authorization: `Bearer ${accessToken}` };
 }
 
+function coercePreset(
+  value: unknown,
+  presets: readonly number[],
+  fallback: number,
+): number {
+  const n = typeof value === "number" ? value : Number(value);
+  return presets.includes(n) ? n : fallback;
+}
+
 export async function fetchGoogleCalendarStatus(
   accessToken: string,
 ): Promise<GoogleCalendarSyncState> {
@@ -31,6 +50,9 @@ export async function fetchGoogleCalendarStatus(
     headers: authHeaders(accessToken),
     cache: "no-store",
   });
+  if (res.status === 401) {
+    throw new Error("Session expired — sign in to Eventra again.");
+  }
   if (!res.ok) {
     throw new Error("Could not load Google Calendar status.");
   }
@@ -41,6 +63,16 @@ export async function fetchGoogleCalendarStatus(
       typeof data.connectedAt === "string" ? data.connectedAt : null,
     lastSyncedAt:
       typeof data.lastSyncedAt === "string" ? data.lastSyncedAt : null,
+    syncDaysBack: coercePreset(
+      data.syncDaysBack,
+      SYNC_DAYS_BACK_PRESETS,
+      DEFAULT_SYNC_DAYS_BACK,
+    ),
+    syncDaysForward: coercePreset(
+      data.syncDaysForward,
+      SYNC_DAYS_FORWARD_PRESETS,
+      DEFAULT_SYNC_DAYS_FORWARD,
+    ),
   };
 }
 
@@ -113,6 +145,26 @@ export async function syncGoogleCalendar(accessToken: string): Promise<string> {
       : new Date().toISOString();
   notifyChanged();
   return syncedAt;
+}
+
+export async function updateGoogleCalendarSyncWindow(
+  accessToken: string,
+  window: { syncDaysBack: number; syncDaysForward: number },
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/integrations/google-calendar/sync-window`,
+    {
+      method: "PATCH",
+      headers: {
+        ...authHeaders(accessToken),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(window),
+    },
+  );
+  if (!res.ok) {
+    throw new Error("Could not save the Google Calendar sync window.");
+  }
 }
 
 export { DEFAULT_STATE as googleCalendarDefaultState };

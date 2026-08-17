@@ -16,7 +16,7 @@ import {
 } from "@/lib/app-settings";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod/v3";
 
@@ -241,7 +241,20 @@ export function SettingsPanel() {
           </div>
         </section>
 
-        <GoogleCalendarSyncSection />
+        <Suspense
+          fallback={
+            <section className="rounded-xl border border-zinc-200/80 bg-white/80 p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950/60">
+              <h2 className="text-md font-semibold text-zinc-900 dark:text-zinc-50">
+                Google Calendar
+              </h2>
+              <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
+                Loading connection status…
+              </p>
+            </section>
+          }
+        >
+          <GoogleCalendarSyncSection />
+        </Suspense>
 
         <div className="flex flex-wrap items-center gap-3">
           <Button type="submit" disabled={invalidRange}>
