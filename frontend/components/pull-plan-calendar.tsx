@@ -3,6 +3,11 @@
 import { CalendarCreateEventModal } from "@/components/calendar-create-event-modal";
 import { Button } from "@/components/ui/button";
 import { loadAppSettings } from "@/lib/app-settings";
+import { getStoredAuth } from "@/lib/auth-api";
+import {
+  fetchGoogleCalendarStatus,
+  syncGoogleCalendar,
+} from "@/lib/google-calendar-sync";
 import { createTask, fetchTasks, type ApiTask } from "@/lib/tasks-api";
 import { cn } from "@/lib/utils";
 import dayjs from "dayjs";
@@ -21,6 +26,7 @@ import "pull-plan-calendar/dist/calendar.css";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const calendarNavIconClass = "size-4 shrink-0";
+const GOOGLE_EVENT_COLOR = "#4285F4";
 
 function CalendarAddEventButton({ onClick }: { onClick: () => void }) {
   return (
@@ -104,6 +110,11 @@ function CalendarEventDetailModal({
         <p className="mt-3 font-medium text-zinc-900 dark:text-zinc-50">
           {task.name}
         </p>
+        {task.source === "google" ? (
+          <p className="mt-1 text-xs font-medium text-[#4285F4]">
+            Google Calendar
+          </p>
+        ) : null}
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
           Start: {dayjs(task.startDate).format("MMM D, YYYY")}
         </p>
@@ -142,7 +153,16 @@ function apiTaskToLibraryTask(t: ApiTask): Task {
       name: e.name ?? undefined,
     })),
     progressStatus: status,
+    source: t.source,
   };
+}
+
+function toCalendarEvent(task: ApiTask): CalendarEvent {
+  const event = mapTaskToEvent(apiTaskToLibraryTask(task));
+  if (task.source === "google") {
+    return { ...event, color: GOOGLE_EVENT_COLOR };
+  }
+  return event;
 }
 
 export function PullPlanCalendar() {
@@ -168,12 +188,39 @@ export function PullPlanCalendar() {
     return () => clearInterval(t);
   }, [load]);
 
-  const { scheduledLib, unscheduledLib } = useMemo(() => {
+  useEffect(() => {
+    const token = getStoredAuth()?.token;
+    if (!token) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const status = await fetchGoogleCalendarStatus(token);
+        if (cancelled || !status.connected || status.lastSyncedAt) return;
+        await syncGoogleCalendar(token);
+        if (!cancelled) await load();
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Google Calendar sync failed",
+          );
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [load]);
+
+  const { scheduledEvents, unscheduledEvents } = useMemo(() => {
     const scheduled = tasks.filter((t) => t.scheduled);
     const unscheduled = tasks.filter((t) => !t.scheduled);
     return {
-      scheduledLib: scheduled.map(apiTaskToLibraryTask),
-      unscheduledLib: unscheduled.map(apiTaskToLibraryTask),
+      scheduledEvents: scheduled.map(toCalendarEvent),
+      unscheduledEvents: unscheduled.map(toCalendarEvent),
     };
   }, [tasks]);
 
@@ -200,26 +247,14 @@ export function PullPlanCalendar() {
 
   return (
     <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-3">
-      {/* <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-sm text-zinc-600 dark:text-zinc-400">
-          {lastSynced
-            ? `Last synced ${lastSynced.toLocaleTimeString()} · polling /tasks`
-            : "Loading…"}
-        </div>
-        <Button
-          type="button"
-          onClick={() => void handleCreateDemo()}
-          disabled={pending}
-          className="bg-teal-600 text-white shadow-sm hover:bg-teal-700 disabled:opacity-50 dark:bg-teal-500 dark:hover:bg-teal-600"
-        >
-          {pending ? "Creating…" : "Create task (→ Kafka → worker → DB)"}
-        </Button>
-      </div>
       {error ? (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200">
+        <p
+          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200"
+          role="alert"
+        >
           {error}
         </p>
-      ) : null} */}
+      ) : null}
 
       <CalendarContainer
         key={calendarKey}
@@ -227,8 +262,8 @@ export function PullPlanCalendar() {
         showTabs={false}
         views={["week", "year", "day", "month"]}
         areas={MOCK_AREAS}
-        defaultScheduledEvents={scheduledLib.map(mapTaskToEvent)}
-        defaultUnscheduledEvents={unscheduledLib.map(mapTaskToEvent)}
+        defaultScheduledEvents={scheduledEvents}
+        defaultUnscheduledEvents={unscheduledEvents}
         onEventMove={async () => {}}
         onEventResize={async () => {}}
         onEventCreate={async () => {}}

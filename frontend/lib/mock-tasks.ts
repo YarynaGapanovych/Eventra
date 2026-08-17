@@ -17,7 +17,7 @@ export function buildMockTasks(): ApiTask[] {
 
   const iso = (d: dayjs.Dayjs) => d.toISOString();
 
-  const tasks: ApiTask[] = [
+  const tasks: Omit<ApiTask, "source">[] = [
     {
       id: `${MOCK_TASK_ID_PREFIX}kickoff`,
       name: "Sprint kickoff & goals",
@@ -127,5 +127,7 @@ export function buildMockTasks(): ApiTask[] {
     },
   ];
 
-  return [...tasks].sort((a, b) => a.startDate.localeCompare(b.startDate));
+  return [...tasks]
+    .map((task) => ({ ...task, source: "eventra" as const }))
+    .sort((a, b) => a.startDate.localeCompare(b.startDate));
 }

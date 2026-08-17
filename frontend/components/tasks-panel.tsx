@@ -4,6 +4,7 @@ import { TaskEditDialog } from "@/components/task-edit-dialog";
 import { TasksKanbanView } from "@/components/tasks-kanban-view";
 import { TasksListView } from "@/components/tasks-list-view";
 import { Button } from "@/components/ui/button";
+import { getStoredAuth } from "@/lib/auth-api";
 import {
   fetchTasks,
   isMockTaskId,
@@ -42,7 +43,7 @@ export function TasksPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const mockActive = tasksUseMocks();
+  const [mockActive, setMockActive] = useState(false);
 
   const filteredTasks = useMemo(() => {
     if (!queryRaw) return tasks;
@@ -66,6 +67,7 @@ export function TasksPanel() {
   }, []);
 
   useEffect(() => {
+    setMockActive(tasksUseMocks() && !getStoredAuth()?.token);
     void load();
   }, [load]);
 

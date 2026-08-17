@@ -41,6 +41,9 @@ export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
   high: "High",
 };
 
+export const TASK_SOURCES = ["eventra", "google"] as const;
+export type TaskSource = (typeof TASK_SOURCES)[number];
+
 export type ApiTask = {
   id: string;
   name: string;
@@ -52,11 +55,12 @@ export type ApiTask = {
   deadline: string | null;
   scheduled: boolean;
   areaId: string | null;
+  source: TaskSource;
   employees: { id: string; name: string | null }[];
 };
 
 export async function fetchTasks(): Promise<ApiTask[]> {
-  if (tasksUseMocks()) {
+  if (tasksUseMocks() && !getStoredAuth()?.token) {
     return buildMockTasks();
   }
   const res = await fetch(`${API_BASE}/tasks`, {
@@ -66,7 +70,11 @@ export async function fetchTasks(): Promise<ApiTask[]> {
   if (!res.ok) {
     throw new Error(`GET /tasks failed: ${res.status}`);
   }
-  return res.json();
+  const rows = (await res.json()) as ApiTask[];
+  return rows.map((task) => ({
+    ...task,
+    source: task.source === "google" ? "google" : "eventra",
+  }));
 }
 
 export async function createTask(body: {
