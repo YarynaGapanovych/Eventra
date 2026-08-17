@@ -20,6 +20,11 @@ enum TaskPriority {
   high
 }
 
+enum TaskSource {
+  eventra
+  google
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -28,10 +33,27 @@ model User {
   name         String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  googleCalendarIntegration GoogleCalendarIntegration?
+  tasks                     Task[]
+}
+
+model GoogleCalendarIntegration {
+  id                    String    @id @default(cuid())
+  userId                String    @unique
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenEncrypted String
+  accessTokenEncrypted  String?
+  accessTokenExpiresAt  DateTime?
+  connectedAt           DateTime  @default(now())
+  lastSyncedAt          DateTime?
+  updatedAt             DateTime  @updatedAt
 }
 
 model Task {
   id             String           @id @default(cuid())
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   name           String
   startDate      DateTime
   endDate        DateTime
@@ -41,7 +63,12 @@ model Task {
   deadline       DateTime?
   scheduled      Boolean          @default(false)
   areaId         String?
+  googleEventId  String?
+  source         TaskSource       @default(eventra)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@unique([userId, googleEventId])
+  @@index([userId])
 }
