@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "module": "node16",
+    "module": "commonjs",
     "declaration": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,
@@ -19,7 +19,7 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "strict": true,
-    "moduleResolution": "node16",
+    "moduleResolution": "node",
     "rootDir": "./src"
   },
   "include": ["src/**/*.ts"],
