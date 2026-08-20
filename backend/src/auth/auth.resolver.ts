@@ -1,9 +1,12 @@
-import { UsePipes, ValidationPipe } from "@nestjs/common";
-import { Args, Mutation, Resolver } from "@nestjs/graphql";
+import { BadRequestException, UseGuards, UsePipes, ValidationPipe } from "@nestjs/common";
+import { Args, Mutation, Query, Resolver } from "@nestjs/graphql";
 import { AuthService } from "./auth.service";
-import { AuthPayload } from "./auth.types";
+import { AuthPayload, AuthUser } from "./auth.types";
+import { CurrentUser } from "./current-user.decorator";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
+import { GqlAuthGuard } from "./gql-auth.guard";
+import type { JwtUser } from "./jwt-user";
 
 const gqlValidationPipe = new ValidationPipe({
   transform: true,
@@ -24,5 +27,19 @@ export class AuthResolver {
   @Mutation(() => AuthPayload)
   login(@Args("input") input: LoginDto): Promise<AuthPayload> {
     return this.authService.login(input);
+  }
+
+  @Mutation(() => AuthPayload)
+  completeGoogleLogin(@Args("code") code: string): Promise<AuthPayload> {
+    if (!code?.trim()) {
+      throw new BadRequestException("code is required");
+    }
+    return this.authService.completeGoogleExchange(code.trim());
+  }
+
+  @Query(() => AuthUser)
+  @UseGuards(GqlAuthGuard)
+  me(@CurrentUser() user: JwtUser): Promise<AuthUser> {
+    return this.authService.me(user.userId);
   }
 }

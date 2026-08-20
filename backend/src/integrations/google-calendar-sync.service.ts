@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { TaskSource } from '../generated/prisma/client';
+import { EventSource } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { GoogleCalendarIntegrationService } from './google-calendar-integration.service';
 
@@ -53,11 +53,11 @@ export class GoogleCalendarSyncService {
     let imported = 0;
     for (const event of events) {
       if (!event.id || event.status === 'cancelled') continue;
-      const mapped = this.mapEventToTask(userId, event);
+      const mapped = this.mapGoogleEvent(userId, event);
       if (!mapped) continue;
 
       seenIds.add(event.id);
-      await this.prisma.task.upsert({
+      await this.prisma.event.upsert({
         where: {
           userId_googleEventId: {
             userId,
@@ -66,18 +66,18 @@ export class GoogleCalendarSyncService {
         },
         create: mapped,
         update: {
-          name: mapped.name,
-          startDate: mapped.startDate,
-          endDate: mapped.endDate,
-          scheduled: true,
-          source: TaskSource.google,
+          title: mapped.title,
+          start: mapped.start,
+          end: mapped.end,
+          source: EventSource.google,
+          taskId: null,
         },
       });
       imported += 1;
     }
 
-    await this.pruneMissingGoogleTasks(userId, timeMin, timeMax, seenIds);
-    await this.pruneGoogleTasksOutsideWindow(userId, timeMin, timeMax);
+    await this.pruneMissingGoogleEvents(userId, timeMin, timeMax, seenIds);
+    await this.pruneGoogleEventsOutsideWindow(userId, timeMin, timeMax);
 
     const syncedAt = new Date();
     await this.prisma.googleCalendarIntegration.update({
@@ -126,7 +126,7 @@ export class GoogleCalendarSyncService {
     return items;
   }
 
-  private async pruneMissingGoogleTasks(
+  private async pruneMissingGoogleEvents(
     userId: string,
     timeMin: Date,
     timeMax: Date,
@@ -134,16 +134,16 @@ export class GoogleCalendarSyncService {
   ): Promise<void> {
     const windowFilter = {
       userId,
-      source: TaskSource.google,
-      startDate: { gte: timeMin, lte: timeMax },
+      source: EventSource.google,
+      start: { gte: timeMin, lte: timeMax },
     };
 
     if (seenIds.size === 0) {
-      await this.prisma.task.deleteMany({ where: windowFilter });
+      await this.prisma.event.deleteMany({ where: windowFilter });
       return;
     }
 
-    await this.prisma.task.deleteMany({
+    await this.prisma.event.deleteMany({
       where: {
         ...windowFilter,
         googleEventId: { notIn: [...seenIds] },
@@ -151,46 +151,46 @@ export class GoogleCalendarSyncService {
     });
   }
 
-  private async pruneGoogleTasksOutsideWindow(
+  private async pruneGoogleEventsOutsideWindow(
     userId: string,
     timeMin: Date,
     timeMax: Date,
   ): Promise<void> {
-    await this.prisma.task.deleteMany({
+    await this.prisma.event.deleteMany({
       where: {
         userId,
-        source: TaskSource.google,
-        OR: [{ startDate: { lt: timeMin } }, { startDate: { gt: timeMax } }],
+        source: EventSource.google,
+        OR: [{ start: { lt: timeMin } }, { start: { gt: timeMax } }],
       },
     });
   }
 
-  private mapEventToTask(
+  private mapGoogleEvent(
     userId: string,
     event: GoogleCalendarEvent,
   ): {
     userId: string;
-    name: string;
-    startDate: Date;
-    endDate: Date;
-    scheduled: boolean;
+    title: string;
+    start: Date;
+    end: Date;
     googleEventId: string;
-    source: TaskSource;
+    source: EventSource;
+    taskId: null;
   } | null {
     if (!event.id) return null;
 
-    const startDate = this.parseGoogleDate(event.start);
-    const endDate = this.parseGoogleDate(event.end, true);
-    if (!startDate || !endDate) return null;
+    const start = this.parseGoogleDate(event.start);
+    const end = this.parseGoogleDate(event.end, true);
+    if (!start || !end) return null;
 
     return {
       userId,
-      name: event.summary?.trim() || 'Untitled event',
-      startDate,
-      endDate: endDate > startDate ? endDate : startDate,
-      scheduled: true,
+      title: event.summary?.trim() || 'Untitled event',
+      start,
+      end: end > start ? end : start,
       googleEventId: event.id,
-      source: TaskSource.google,
+      source: EventSource.google,
+      taskId: null,
     };
   }
 

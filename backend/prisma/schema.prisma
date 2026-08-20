@@ -20,7 +20,7 @@ enum TaskPriority {
   high
 }
 
-enum TaskSource {
+enum EventSource {
   eventra
   google
 }
@@ -35,7 +35,22 @@ model User {
   updatedAt    DateTime @updatedAt
 
   googleCalendarIntegration GoogleCalendarIntegration?
+  userSettings              UserSettings?
   tasks                     Task[]
+  events                    Event[]
+}
+
+model UserSettings {
+  id                          String   @id @default(cuid())
+  userId                      String   @unique
+  user                        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workdayStart                String   @default("09:00")
+  workdayEnd                  String   @default("17:00")
+  timezone                    String   @default("UTC")
+  defaultEventDurationMinutes Int      @default(60)
+  showPastDoneTaskEvents      Boolean  @default(true)
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
 }
 
 model GoogleCalendarIntegration {
@@ -53,24 +68,38 @@ model GoogleCalendarIntegration {
 }
 
 model Task {
-  id             String           @id @default(cuid())
+  id             String          @id @default(cuid())
   userId         String
-  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   name           String
-  startDate      DateTime
-  endDate        DateTime
-  progressStatus String           @default("not_started")
-  status         TaskBoardStatus  @default(todo)
-  priority       TaskPriority     @default(medium)
+  progressStatus String          @default("not_started")
+  status         TaskBoardStatus @default(todo)
+  priority       TaskPriority    @default(medium)
   deadline       DateTime?
-  scheduled      Boolean          @default(false)
   areaId         String?
-  googleEventId  String?
-  source         TaskSource       @default(eventra)
+  events         Event[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([userId, googleEventId])
   @@index([userId])
+}
+
+model Event {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  start         DateTime
+  end           DateTime
+  source        EventSource @default(eventra)
+  googleEventId String?
+  taskId        String?
+  task          Task?       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([userId, googleEventId])
+  @@index([userId, start])
+  @@index([taskId])
 }

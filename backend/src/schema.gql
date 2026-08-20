@@ -13,23 +13,164 @@ type AuthUser {
   name: String
 }
 
+input CreateEventInput {
+  end: String!
+  start: String!
+  title: String!
+}
+
+input CreateTaskInput {
+  deadline: String
+  name: String!
+  priority: TaskPriority
+  status: TaskBoardStatus
+}
+
+type Event {
+  end: String!
+  googleEventId: String
+  id: String!
+  source: EventSource!
+  start: String!
+  taskId: String
+  title: String!
+}
+
+enum EventSource {
+  eventra
+  google
+}
+
+type GoogleCalendarConnectPayload {
+  connectUrl: String!
+}
+
+type GoogleCalendarDisconnectPayload {
+  ok: Boolean!
+}
+
+type GoogleCalendarStatus {
+  connected: Boolean!
+  connectedAt: String
+  lastSyncedAt: String
+  syncDaysBack: Int!
+  syncDaysForward: Int!
+}
+
+type GoogleCalendarSyncPayload {
+  imported: Int!
+  ok: Boolean!
+  syncedAt: String!
+}
+
 input LoginInput {
   email: String!
   password: String!
 }
 
 type Mutation {
+  completeGoogleLogin(code: String!): AuthPayload!
+  createEvent(input: CreateEventInput!): Event!
+  createTask(input: CreateTaskInput!): Task!
+  deleteEvent(id: String!): Boolean!
+  disconnectGoogleCalendar: GoogleCalendarDisconnectPayload!
   login(input: LoginInput!): AuthPayload!
   register(input: RegisterInput!): AuthPayload!
+  scheduleTask(input: ScheduleTaskInput!): Event!
+  startGoogleCalendarConnect(input: StartGoogleCalendarConnectInput): GoogleCalendarConnectPayload!
+  syncGoogleCalendar: GoogleCalendarSyncPayload!
+  updateEvent(id: String!, input: UpdateEventInput!): Event!
+  updateGoogleCalendarSyncWindow(input: UpdateGoogleCalendarSyncWindowInput!): GoogleCalendarStatus!
+  updateTask(id: String!, input: UpdateTaskInput!): Task!
+  updateUserSettings(input: UpdateUserSettingsInput!): UserSettings!
 }
 
 type Query {
+  events: [Event!]!
+  googleCalendarStatus: GoogleCalendarStatus!
+  me: AuthUser!
+
   """Service liveness probe for GraphQL."""
   ping: String!
+  tasks: [Task!]!
+  userSettings: UserSettings!
 }
 
 input RegisterInput {
   email: String!
   name: String
   password: String!
+}
+
+input ScheduleTaskInput {
+  end: String!
+  start: String!
+  taskId: String!
+}
+
+input StartGoogleCalendarConnectInput {
+  redirectUri: String
+}
+
+type Task {
+  areaId: String
+  deadline: String
+  employees: [TaskEmployee!]!
+  events: [Event!]!
+  id: String!
+  name: String!
+  priority: TaskPriority!
+  progressStatus: String!
+  status: TaskBoardStatus!
+}
+
+enum TaskBoardStatus {
+  done
+  in_progress
+  todo
+}
+
+type TaskEmployee {
+  id: String!
+  name: String
+}
+
+enum TaskPriority {
+  high
+  low
+  medium
+}
+
+input UpdateEventInput {
+  end: String
+  start: String
+  title: String
+}
+
+input UpdateGoogleCalendarSyncWindowInput {
+  syncDaysBack: Int
+  syncDaysForward: Int
+}
+
+input UpdateTaskInput {
+  deadline: String
+  name: String
+  priority: TaskPriority
+  status: TaskBoardStatus
+}
+
+input UpdateUserSettingsInput {
+  defaultEventDurationMinutes: Int!
+  showPastDoneTaskEvents: Boolean!
+  timezone: String!
+  workdayEnd: String!
+  workdayStart: String!
+}
+
+type UserSettings {
+  defaultEventDurationMinutes: Int!
+  showPastDoneTaskEvents: Boolean!
+  timezone: String!
+  workdayEnd: String!
+  workdayStart: String!
 }
