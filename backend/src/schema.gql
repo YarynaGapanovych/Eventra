@@ -13,34 +13,103 @@ type AuthUser {
   name: String
 }
 
+type CalendarGuest {
+  email: String!
+  id: String!
+  name: String
+  response: GuestResponse!
+}
+
+input CalendarGuestInput {
+  email: String!
+  name: String
+}
+
+type CalendarReminder {
+  id: String!
+  minutesBefore: Int!
+}
+
+input CalendarReminderInput {
+  minutesBefore: Int!
+}
+
 input CreateEventInput {
+  allDay: Boolean
+  busy: Boolean
   color: String
+  conferenceUrl: String
+  description: String
   end: String!
+  guestCanInvite: Boolean
+  guestCanModify: Boolean
+  guestCanSeeOthers: Boolean
+  guests: [CalendarGuestInput!]
+  location: String
+  recurrence: String
+  reminders: [CalendarReminderInput!]
   start: String!
+  timezone: String
   title: String!
+  visibility: EventVisibility
 }
 
 input CreateTaskInput {
+  allDay: Boolean
+  busy: Boolean
+  color: String
+  conferenceUrl: String
   deadline: String
+  description: String
+  end: String
+  guestCanInvite: Boolean
+  guestCanModify: Boolean
+  guestCanSeeOthers: Boolean
+  guests: [CalendarGuestInput!]
+  location: String
   name: String!
   priority: TaskPriority
+  recurrence: String
+  reminders: [CalendarReminderInput!]
+  start: String
   status: TaskBoardStatus
+  timezone: String
+  visibility: EventVisibility
 }
 
 type Event {
+  allDay: Boolean!
+  busy: Boolean!
   color: String
+  conferenceUrl: String
+  description: String
   end: String!
   googleEventId: String
+  guestCanInvite: Boolean!
+  guestCanModify: Boolean!
+  guestCanSeeOthers: Boolean!
+  guests: [CalendarGuest!]!
   id: String!
+  location: String
+  recurrence: String
+  reminders: [CalendarReminder!]!
   source: EventSource!
   start: String!
   taskId: String
+  timezone: String
   title: String!
+  visibility: EventVisibility!
 }
 
 enum EventSource {
   eventra
   google
+}
+
+enum EventVisibility {
+  default
+  private
+  public
 }
 
 type GoogleCalendarConnectPayload {
@@ -63,6 +132,13 @@ type GoogleCalendarSyncPayload {
   imported: Int!
   ok: Boolean!
   syncedAt: String!
+}
+
+enum GuestResponse {
+  accepted
+  declined
+  needsAction
+  tentative
 }
 
 input LoginInput {
@@ -115,15 +191,31 @@ input StartGoogleCalendarConnectInput {
 }
 
 type Task {
+  allDay: Boolean!
   areaId: String
+  busy: Boolean!
+  color: String
+  conferenceUrl: String
   deadline: String
+  description: String
   employees: [TaskEmployee!]!
+  end: String
   events: [Event!]!
+  guestCanInvite: Boolean!
+  guestCanModify: Boolean!
+  guestCanSeeOthers: Boolean!
+  guests: [CalendarGuest!]!
   id: String!
+  location: String
   name: String!
   priority: TaskPriority!
   progressStatus: String!
+  recurrence: String
+  reminders: [CalendarReminder!]!
+  start: String
   status: TaskBoardStatus!
+  timezone: String
+  visibility: EventVisibility!
 }
 
 enum TaskBoardStatus {
@@ -144,10 +236,23 @@ enum TaskPriority {
 }
 
 input UpdateEventInput {
+  allDay: Boolean
+  busy: Boolean
   color: String
+  conferenceUrl: String
+  description: String
   end: String
+  guestCanInvite: Boolean
+  guestCanModify: Boolean
+  guestCanSeeOthers: Boolean
+  guests: [CalendarGuestInput!]
+  location: String
+  recurrence: String
+  reminders: [CalendarReminderInput!]
   start: String
+  timezone: String
   title: String
+  visibility: EventVisibility
 }
 
 input UpdateGoogleCalendarSyncWindowInput {
@@ -156,10 +261,26 @@ input UpdateGoogleCalendarSyncWindowInput {
 }
 
 input UpdateTaskInput {
+  allDay: Boolean
+  busy: Boolean
+  color: String
+  conferenceUrl: String
   deadline: String
+  description: String
+  end: String
+  guestCanInvite: Boolean
+  guestCanModify: Boolean
+  guestCanSeeOthers: Boolean
+  guests: [CalendarGuestInput!]
+  location: String
   name: String
   priority: TaskPriority
+  recurrence: String
+  reminders: [CalendarReminderInput!]
+  start: String
   status: TaskBoardStatus
+  timezone: String
+  visibility: EventVisibility
 }
 
 input UpdateUserSettingsInput {

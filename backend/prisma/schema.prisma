@@ -25,6 +25,19 @@ enum EventSource {
   google
 }
 
+enum EventVisibility {
+  default
+  public
+  private
+}
+
+enum GuestResponse {
+  needsAction
+  accepted
+  declined
+  tentative
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -77,7 +90,23 @@ model Task {
   priority       TaskPriority    @default(medium)
   deadline       DateTime?
   areaId         String?
+  start          DateTime?
+  end            DateTime?
+  location       String?
+  description    String?
+  allDay         Boolean         @default(false)
+  timezone       String?
+  recurrence     String?
+  busy           Boolean         @default(true)
+  visibility     EventVisibility @default(default)
+  conferenceUrl  String?
+  color          String?
+  guestCanModify Boolean         @default(false)
+  guestCanInvite Boolean         @default(true)
+  guestCanSeeOthers Boolean      @default(true)
   events         Event[]
+  guests         TaskGuest[]
+  reminders      TaskReminder[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -97,10 +126,63 @@ model Event {
   color         String?
   taskId        String?
   task          Task?       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  location      String?
+  description   String?
+  allDay        Boolean     @default(false)
+  timezone      String?
+  recurrence    String?
+  busy          Boolean     @default(true)
+  visibility    EventVisibility @default(default)
+  conferenceUrl String?
+  guestCanModify Boolean    @default(false)
+  guestCanInvite Boolean    @default(true)
+  guestCanSeeOthers Boolean @default(true)
+  guests        EventGuest[]
+  reminders     EventReminder[]
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
   @@unique([userId, googleEventId])
   @@index([userId, start])
+  @@index([taskId])
+}
+
+model EventGuest {
+  id       String        @id @default(cuid())
+  eventId  String
+  event    Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  email    String
+  name     String?
+  response GuestResponse @default(needsAction)
+
+  @@index([eventId])
+}
+
+model TaskGuest {
+  id       String        @id @default(cuid())
+  taskId   String
+  task     Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  email    String
+  name     String?
+  response GuestResponse @default(needsAction)
+
+  @@index([taskId])
+}
+
+model EventReminder {
+  id            String @id @default(cuid())
+  eventId       String
+  event         Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  minutesBefore Int
+
+  @@index([eventId])
+}
+
+model TaskReminder {
+  id            String @id @default(cuid())
+  taskId        String
+  task          Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  minutesBefore Int
+
   @@index([taskId])
 }

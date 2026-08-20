@@ -8,6 +8,10 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { TaskBoardStatus, TaskPriority } from '../generated/prisma/client';
+import {
+  CalendarDetailsFields,
+  CalendarDetailsInput,
+} from '../calendar/calendar.types';
 import { Event } from '../events/event.types';
 
 registerEnumType(TaskBoardStatus, { name: 'TaskBoardStatus' });
@@ -23,7 +27,7 @@ export class TaskEmployee {
 }
 
 @ObjectType()
-export class Task {
+export class Task extends CalendarDetailsFields {
   @Field()
   id!: string;
 
@@ -45,6 +49,15 @@ export class Task {
   @Field(() => String, { nullable: true })
   areaId!: string | null;
 
+  @Field(() => String, { nullable: true })
+  start!: string | null;
+
+  @Field(() => String, { nullable: true })
+  end!: string | null;
+
+  @Field(() => String, { nullable: true })
+  color!: string | null;
+
   @Field(() => [TaskEmployee])
   employees!: TaskEmployee[];
 
@@ -53,7 +66,7 @@ export class Task {
 }
 
 @InputType()
-export class CreateTaskInput {
+export class CreateTaskInput extends CalendarDetailsInput {
   @Field()
   @IsString()
   @MinLength(1)
@@ -69,15 +82,25 @@ export class CreateTaskInput {
   @IsEnum(TaskPriority)
   priority?: TaskPriority;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsDateString()
   deadline?: string;
+
+  @Field(() => String, { nullable: true })
+  @IsOptional()
+  @IsDateString()
+  start?: string;
+
+  @Field(() => String, { nullable: true })
+  @IsOptional()
+  @IsDateString()
+  end?: string;
 }
 
 @InputType()
-export class UpdateTaskInput {
-  @Field({ nullable: true })
+export class UpdateTaskInput extends CalendarDetailsInput {
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @MinLength(1)
@@ -98,4 +121,16 @@ export class UpdateTaskInput {
   @ValidateIf((_, value) => value != null)
   @IsDateString()
   deadline?: string | null;
+
+  @Field(() => String, { nullable: true })
+  @IsOptional()
+  @ValidateIf((_, value) => value != null)
+  @IsDateString()
+  start?: string | null;
+
+  @Field(() => String, { nullable: true })
+  @IsOptional()
+  @ValidateIf((_, value) => value != null)
+  @IsDateString()
+  end?: string | null;
 }

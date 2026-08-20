@@ -3,17 +3,18 @@ import {
   IsDateString,
   IsOptional,
   IsString,
-  Matches,
   MinLength,
 } from 'class-validator';
 import { EventSource } from '../generated/prisma/client';
-
-const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
+import {
+  CalendarDetailsFields,
+  CalendarDetailsInput,
+} from '../calendar/calendar.types';
 
 registerEnumType(EventSource, { name: 'EventSource' });
 
 @ObjectType()
-export class Event {
+export class Event extends CalendarDetailsFields {
   @Field()
   id!: string;
 
@@ -40,7 +41,7 @@ export class Event {
 }
 
 @InputType()
-export class CreateEventInput {
+export class CreateEventInput extends CalendarDetailsInput {
   @Field()
   @IsString()
   @MinLength(1)
@@ -53,35 +54,25 @@ export class CreateEventInput {
   @Field()
   @IsDateString()
   end!: string;
-
-  @Field({ nullable: true })
-  @IsOptional()
-  @Matches(HEX_COLOR, { message: 'Color must be a 6-digit hex value.' })
-  color?: string;
 }
 
 @InputType()
-export class UpdateEventInput {
-  @Field({ nullable: true })
+export class UpdateEventInput extends CalendarDetailsInput {
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @MinLength(1)
   title?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsDateString()
   start?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsDateString()
   end?: string;
-
-  @Field({ nullable: true })
-  @IsOptional()
-  @Matches(HEX_COLOR, { message: 'Color must be a 6-digit hex value.' })
-  color?: string;
 }
 
 @InputType()
