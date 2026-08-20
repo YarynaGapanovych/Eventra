@@ -1,7 +1,6 @@
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
-import { getStoredAuth } from "@/lib/auth-api";
 import {
   buildMockTasks,
   isMockTaskId,
@@ -16,11 +15,6 @@ export function tasksUseMocks(): boolean {
   if (v === "0" || v === "false") return false;
   if (v === "1" || v === "true") return true;
   return process.env.NODE_ENV === "development";
-}
-
-function taskAuthHeaders(): HeadersInit {
-  const token = getStoredAuth()?.token;
-  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 export const TASK_BOARD_STATUSES = ["todo", "in_progress", "done"] as const;
@@ -41,79 +35,45 @@ export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
   high: "High",
 };
 
-export const TASK_SOURCES = ["eventra", "google"] as const;
-export type TaskSource = (typeof TASK_SOURCES)[number];
+export type ApiTaskEvent = {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  source: "eventra" | "google";
+  googleEventId: string | null;
+  taskId: string | null;
+};
 
 export type ApiTask = {
   id: string;
   name: string;
-  startDate: string;
-  endDate: string;
   progressStatus: string;
   status: TaskBoardStatus;
   priority: TaskPriority;
   deadline: string | null;
-  scheduled: boolean;
   areaId: string | null;
-  source: TaskSource;
   employees: { id: string; name: string | null }[];
+  events: ApiTaskEvent[];
 };
 
-export async function fetchTasks(): Promise<ApiTask[]> {
-  if (tasksUseMocks() && !getStoredAuth()?.token) {
-    return buildMockTasks();
-  }
-  const res = await fetch(`${API_BASE}/tasks`, {
-    cache: "no-store",
-    headers: taskAuthHeaders(),
-  });
-  if (!res.ok) {
-    throw new Error(`GET /tasks failed: ${res.status}`);
-  }
-  const rows = (await res.json()) as ApiTask[];
-  return rows.map((task) => ({
-    ...task,
-    source: task.source === "google" ? "google" : "eventra",
-  }));
-}
-
-export async function createTask(body: {
+export type CreateTaskInput = {
   name: string;
-  startDate: string;
-  endDate: string;
   status?: TaskBoardStatus;
   priority?: TaskPriority;
   deadline?: string;
-}): Promise<{ id: string; status: string }> {
-  const res = await fetch(`${API_BASE}/tasks`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...taskAuthHeaders() },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    throw new Error(await res.text());
-  }
-  return res.json();
-}
+};
 
-export async function updateTask(
-  id: string,
-  body: Partial<{
-    name: string;
-    startDate: string;
-    endDate: string;
-    status: TaskBoardStatus;
-    priority: TaskPriority;
-    deadline: string | null;
-  }>,
-): Promise<ApiTask> {
-  const res = await fetch(`${API_BASE}/tasks/${encodeURIComponent(id)}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json", ...taskAuthHeaders() },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    throw new Error(await res.text());
-  }
-  return res.json();
+export type UpdateTaskInput = Partial<{
+  name: string;
+  status: TaskBoardStatus;
+  priority: TaskPriority;
+  deadline: string | null;
+}>;
+
+export function normalizeApiTask(task: ApiTask): ApiTask {
+  return {
+    ...task,
+    events: task.events ?? [],
+  };
 }

@@ -64,9 +64,10 @@ export function TasksListView({ tasks, onEdit }: Props) {
         cell: ({ row }) => (
           <span className="inline-flex flex-wrap items-center gap-2">
             <span className="font-medium">{row.original.name}</span>
-            {row.original.source === "google" ? (
-              <span className="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
-                Google
+            {row.original.events.length > 0 ? (
+              <span className="inline-flex rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                {row.original.events.length} block
+                {row.original.events.length === 1 ? "" : "s"}
               </span>
             ) : null}
           </span>

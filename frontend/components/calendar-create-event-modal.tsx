@@ -4,18 +4,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { loadAppSettings } from "@/lib/app-settings";
+import { DEFAULT_APP_SETTINGS } from "@/lib/app-settings";
+import { useUserSettingsQuery } from "@/hooks/use-user-settings";
 import dayjs from "dayjs";
 import type { Dayjs } from "dayjs";
 import type { CreateTaskModalProps } from "pull-plan-calendar";
 import { X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
-function defaultCalendarEndDay(start: Dayjs): Dayjs {
-  const mins = loadAppSettings().defaultEventDurationMinutes;
-  const m = mins <= 0 ? 60 : mins;
-  const inclusiveSlots = Math.max(1, Math.ceil(m / (24 * 60)));
-  return start.startOf("day").add(Math.max(0, inclusiveSlots - 1), "day");
+function defaultEnd(start: Dayjs, durationMinutes: number): Dayjs {
+  const m = durationMinutes <= 0 ? 60 : durationMinutes;
+  return start.add(m, "minute");
 }
 
 export function CalendarCreateEventModal({
@@ -25,18 +24,22 @@ export function CalendarCreateEventModal({
   onSubmit,
   className,
 }: CreateTaskModalProps) {
-  const [taskName, setTaskName] = useState("");
-  const [startDate, setStartDate] = useState(() => dayjs());
+  const settingsQuery = useUserSettingsQuery();
+  const durationMinutes =
+    settingsQuery.data?.defaultEventDurationMinutes ??
+    DEFAULT_APP_SETTINGS.defaultEventDurationMinutes;
+  const [title, setTitle] = useState("");
+  const [startDate, setStartDate] = useState(() => dayjs().minute(0).second(0));
   const [endDate, setEndDate] = useState(() =>
-    defaultCalendarEndDay(dayjs()),
+    defaultEnd(dayjs().minute(0).second(0), DEFAULT_APP_SETTINGS.defaultEventDurationMinutes),
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const reset = () => {
-    setTaskName("");
-    const s = dayjs();
+    setTitle("");
+    const s = dayjs().minute(0).second(0);
     setStartDate(s);
-    setEndDate(defaultCalendarEndDay(s));
+    setEndDate(defaultEnd(s, durationMinutes));
   };
 
   const handleCancel = () => {
@@ -49,9 +52,7 @@ export function CalendarCreateEventModal({
     setIsSubmitting(true);
     try {
       if (onSubmit) {
-        await onSubmit({ name: taskName, startDate, endDate });
-      } else {
-        await new Promise((r) => setTimeout(r, 500));
+        await onSubmit({ name: title, startDate, endDate });
       }
       reset();
       onClose();
@@ -85,7 +86,7 @@ export function CalendarCreateEventModal({
             id="calendar-create-event-title"
             className="text-lg font-semibold text-zinc-900 dark:text-zinc-50"
           >
-            Create new task
+            Create event
           </h2>
           <Button
             type="button"
@@ -101,43 +102,40 @@ export function CalendarCreateEventModal({
 
         <form className="mt-4 space-y-4" onSubmit={(e) => void handleSubmit(e)}>
           <div className="space-y-2">
-            <Label htmlFor="calendar-create-task-name">Task name</Label>
+            <Label htmlFor="calendar-create-event-title-input">Title</Label>
             <Input
-              id="calendar-create-task-name"
+              id="calendar-create-event-title-input"
               type="text"
-              value={taskName}
-              onChange={(e) => setTaskName(e.target.value)}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
               required
-              placeholder="Enter task name"
+              placeholder="Event title"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="calendar-create-start">Start date</Label>
+            <Label htmlFor="calendar-create-start">Start</Label>
             <Input
               id="calendar-create-start"
-              type="date"
-              value={startDate.format("YYYY-MM-DD")}
+              type="datetime-local"
+              value={startDate.format("YYYY-MM-DDTHH:mm")}
               onChange={(e) => {
                 const next = dayjs(e.target.value);
                 setStartDate(next);
                 setEndDate((prev) =>
-                  prev.isBefore(next.startOf("day"))
-                    ? defaultCalendarEndDay(next)
-                    : prev,
+                  prev.isBefore(next) ? defaultEnd(next, durationMinutes) : prev,
                 );
               }}
               required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="calendar-create-end">End date</Label>
+            <Label htmlFor="calendar-create-end">End</Label>
             <Input
               id="calendar-create-end"
-              type="date"
-              value={endDate.format("YYYY-MM-DD")}
+              type="datetime-local"
+              value={endDate.format("YYYY-MM-DDTHH:mm")}
               onChange={(e) => setEndDate(dayjs(e.target.value))}
               required
-              min={startDate.format("YYYY-MM-DD")}
             />
           </div>
           {areaId ? (
@@ -150,11 +148,8 @@ export function CalendarCreateEventModal({
             <Button type="button" variant="outline" onClick={handleCancel}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting || !taskName.trim()}
-            >
-              {isSubmitting ? "Creating…" : "Create task"}
+            <Button type="submit" disabled={isSubmitting || !title.trim()}>
+              {isSubmitting ? "Creating…" : "Create event"}
             </Button>
           </div>
         </form>

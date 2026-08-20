@@ -2,20 +2,20 @@
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import {
+  useDisconnectGoogleCalendarMutation,
+  useGoogleCalendarStatusQuery,
+  useStartGoogleCalendarConnectMutation,
+  useSyncGoogleCalendarMutation,
+  useUpdateGoogleCalendarSyncWindowMutation,
+} from "@/hooks/use-google-calendar";
 import { getStoredAuth } from "@/lib/auth-api";
 import {
   DEFAULT_SYNC_DAYS_BACK,
   DEFAULT_SYNC_DAYS_FORWARD,
-  disconnectGoogleCalendar,
-  fetchGoogleCalendarStatus,
-  GOOGLE_CALENDAR_SYNC_CHANGED_EVENT,
   googleCalendarDefaultState,
-  startGoogleCalendarConnect,
   SYNC_DAYS_BACK_PRESETS,
   SYNC_DAYS_FORWARD_PRESETS,
-  syncGoogleCalendar,
-  updateGoogleCalendarSyncWindow,
-  type GoogleCalendarSyncState,
 } from "@/lib/google-calendar-sync";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
@@ -23,7 +23,7 @@ import { CalendarSync, CheckCircle2, Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 function formatWhen(iso: string | null): string | null {
   if (!iso) return null;
@@ -65,62 +65,38 @@ export function GoogleCalendarSyncSection() {
   const storeToken = useAuthStore((s) => s.token);
   const hydrated = useAuthStore((s) => s.hydrated);
   const token = resolveToken(storeToken);
-  const [state, setState] = useState<GoogleCalendarSyncState>(
-    googleCalendarDefaultState,
-  );
-  const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
+  const signedIn = Boolean(token);
+  const authPending = !hydrated;
+
+  const statusQuery = useGoogleCalendarStatusQuery();
+  const connectMutation = useStartGoogleCalendarConnectMutation();
+  const disconnectMutation = useDisconnectGoogleCalendarMutation();
+  const syncMutation = useSyncGoogleCalendarMutation();
+  const windowMutation = useUpdateGoogleCalendarSyncWindowMutation();
+
   const [error, setError] = useState<string | null>(null);
   const [oauthNotice, setOauthNotice] = useState<string | null>(null);
 
-  const loadConnectionStatus =
-    useCallback(async (): Promise<GoogleCalendarSyncState> => {
-      if (!hydrated) {
-        return googleCalendarDefaultState;
-      }
+  const state = signedIn
+    ? (statusQuery.data ?? googleCalendarDefaultState)
+    : googleCalendarDefaultState;
+  const loading = authPending || (signedIn && statusQuery.isPending);
+  const syncing =
+    connectMutation.isPending ||
+    disconnectMutation.isPending ||
+    syncMutation.isPending ||
+    windowMutation.isPending;
+  const busy = loading || syncing;
+  const statusError =
+    statusQuery.error instanceof Error
+      ? statusQuery.error.message
+      : statusQuery.error
+        ? "Could not load calendar status."
+        : null;
+  const displayError = error ?? statusError;
 
-      const activeToken = resolveToken(useAuthStore.getState().token);
-      if (!activeToken) {
-        setState(googleCalendarDefaultState);
-        setLoading(false);
-        setError(null);
-        return googleCalendarDefaultState;
-      }
-
-      setLoading(true);
-      try {
-        const next = await fetchGoogleCalendarStatus(activeToken);
-        setState(next);
-        setError(null);
-        return next;
-      } catch (err) {
-        setState(googleCalendarDefaultState);
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Could not load calendar status.",
-        );
-        return googleCalendarDefaultState;
-      } finally {
-        setLoading(false);
-      }
-    }, [hydrated, token]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-
-    const onChanged = () => {
-      void loadConnectionStatus();
-    };
-
-    void loadConnectionStatus();
-    window.addEventListener(GOOGLE_CALENDAR_SYNC_CHANGED_EVENT, onChanged);
-    window.addEventListener("eventra-auth", onChanged);
-    return () => {
-      window.removeEventListener(GOOGLE_CALENDAR_SYNC_CHANGED_EVENT, onChanged);
-      window.removeEventListener("eventra-auth", onChanged);
-    };
-  }, [hydrated, loadConnectionStatus]);
+  const refetchStatus = statusQuery.refetch;
+  const syncCalendar = syncMutation.mutateAsync;
 
   useEffect(() => {
     if (!hydrated) return;
@@ -139,28 +115,23 @@ export function GoogleCalendarSyncSection() {
 
       if (oauthStatus === "connected") {
         setOauthNotice(null);
-        const activeToken = resolveToken(useAuthStore.getState().token);
-        if (!activeToken) {
+        if (!resolveToken(useAuthStore.getState().token)) {
           setError("Sign in to Eventra, then connect Google Calendar again.");
           return;
         }
 
-        const next = await loadConnectionStatus();
-        if (next.connected) {
+        const next = await refetchStatus();
+        if (next.data?.connected) {
           setOauthNotice("Google Calendar connected successfully.");
           setError(null);
-          setSyncing(true);
           try {
-            await syncGoogleCalendar(activeToken);
-            await loadConnectionStatus();
+            await syncCalendar();
           } catch (err) {
             setError(
               err instanceof Error
                 ? `Connected, but events could not be imported: ${err.message}`
                 : "Connected, but events could not be imported. Try Sync now.",
             );
-          } finally {
-            setSyncing(false);
           }
         } else {
           setError(
@@ -177,59 +148,44 @@ export function GoogleCalendarSyncSection() {
     next.delete("message");
     const qs = next.toString();
     router.replace(qs ? `/settings?${qs}` : "/settings", { scroll: false });
-  }, [hydrated, loadConnectionStatus, router, searchParams]);
+  }, [hydrated, refetchStatus, router, searchParams, syncCalendar]);
 
   async function handleConnect() {
     setError(null);
     setOauthNotice(null);
-    const activeToken = resolveToken(useAuthStore.getState().token);
-    if (!activeToken) {
+    if (!resolveToken(useAuthStore.getState().token)) {
       setError("Sign in to Eventra before connecting Google Calendar.");
       return;
     }
     try {
-      await startGoogleCalendarConnect(activeToken);
+      await connectMutation.mutateAsync();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Connect failed.");
     }
   }
 
-  async function handleReconnect() {
-    await handleConnect();
-  }
-
   async function handleSync() {
     setError(null);
     setOauthNotice(null);
-    const activeToken = resolveToken(useAuthStore.getState().token);
-    if (!activeToken) {
+    if (!resolveToken(useAuthStore.getState().token)) {
       setError("Sign in to sync Google Calendar.");
       return;
     }
-    setSyncing(true);
     try {
-      await syncGoogleCalendar(activeToken);
-      await loadConnectionStatus();
+      await syncMutation.mutateAsync();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sync failed.");
-    } finally {
-      setSyncing(false);
     }
   }
 
   async function handleDisconnect() {
     setError(null);
     setOauthNotice(null);
-    const activeToken = resolveToken(useAuthStore.getState().token);
-    if (!activeToken) return;
-    setSyncing(true);
+    if (!resolveToken(useAuthStore.getState().token)) return;
     try {
-      await disconnectGoogleCalendar(activeToken);
-      setState(googleCalendarDefaultState);
+      await disconnectMutation.mutateAsync();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Disconnect failed.");
-    } finally {
-      setSyncing(false);
     }
   }
 
@@ -244,39 +200,29 @@ export function GoogleCalendarSyncSection() {
       return;
     }
 
-    setState((prev) => ({ ...prev, ...next }));
     if (!state.connected) return;
 
-    const activeToken = resolveToken(useAuthStore.getState().token);
-    if (!activeToken) {
+    if (!resolveToken(useAuthStore.getState().token)) {
       setError("Sign in to change the Google Calendar sync window.");
       return;
     }
 
     setError(null);
     setOauthNotice(null);
-    setSyncing(true);
     try {
-      await updateGoogleCalendarSyncWindow(activeToken, next);
-      await syncGoogleCalendar(activeToken);
-      await loadConnectionStatus();
+      await windowMutation.mutateAsync(next);
+      await syncMutation.mutateAsync();
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
           : "Could not update the sync window.",
       );
-      await loadConnectionStatus();
-    } finally {
-      setSyncing(false);
     }
   }
 
   const lastSyncedLabel = formatWhen(state.lastSyncedAt);
   const connectedAtLabel = formatWhen(state.connectedAt);
-  const busy = loading || syncing;
-  const signedIn = Boolean(token);
-  const authPending = !hydrated;
 
   return (
     <section className="rounded-xl border border-zinc-200/80 bg-white/80 p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950/60">
@@ -400,7 +346,7 @@ export function GoogleCalendarSyncSection() {
               variant="outline"
               className="h-11 w-full gap-2 rounded-xl sm:w-auto"
               disabled={busy}
-              onClick={() => void handleReconnect()}
+              onClick={() => void handleConnect()}
             >
               <Image
                 src="/icons8-google.svg"
@@ -451,8 +397,10 @@ export function GoogleCalendarSyncSection() {
         </p>
       ) : null}
 
-      {error ? (
-        <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>
+      {displayError ? (
+        <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+          {displayError}
+        </p>
       ) : null}
     </section>
   );

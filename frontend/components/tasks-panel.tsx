@@ -4,22 +4,20 @@ import { TaskEditDialog } from "@/components/task-edit-dialog";
 import { TasksKanbanView } from "@/components/tasks-kanban-view";
 import { TasksListView } from "@/components/tasks-list-view";
 import { Button } from "@/components/ui/button";
+import { useTasksQuery, useUpdateTaskMutation } from "@/hooks/use-tasks";
 import { getStoredAuth } from "@/lib/auth-api";
 import {
-  fetchTasks,
   isMockTaskId,
   TASK_PRIORITY_LABELS,
   TASK_STATUS_LABELS,
   tasksUseMocks,
-  updateTask,
   type ApiTask,
   type TaskBoardStatus,
 } from "@/lib/tasks-api";
 import { cn } from "@/lib/utils";
 import { LayoutGrid, List, Plus } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 type View = "list" | "kanban";
 
@@ -34,16 +32,21 @@ function taskMatchesQuery(task: ApiTask, q: string): boolean {
   return task.employees.some((e) => (e.name ?? "").toLowerCase().includes(n));
 }
 
-export function TasksPanel() {
-  const searchParams = useSearchParams();
-  const queryRaw = searchParams.get("q")?.trim() ?? "";
+export function TasksPanel({ query = "" }: { query?: string }) {
+  const queryRaw = query.trim();
 
   const [view, setView] = useState<View>("list");
-  const [tasks, setTasks] = useState<ApiTask[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const [mockActive, setMockActive] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const mockActive = tasksUseMocks() && !getStoredAuth()?.token;
+  const {
+    data: queryTasks = [],
+    isLoading: loading,
+    isPending,
+    error: queryError,
+  } = useTasksQuery();
+  const updateTaskMutation = useUpdateTaskMutation();
+  const [localTasks, setLocalTasks] = useState<ApiTask[] | null>(null);
+  const tasks = mockActive && localTasks ? localTasks : queryTasks;
 
   const filteredTasks = useMemo(() => {
     if (!queryRaw) return tasks;
@@ -53,23 +56,13 @@ export function TasksPanel() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [editing, setEditing] = useState<ApiTask | null>(null);
-
-  const load = useCallback(async () => {
-    try {
-      setError(null);
-      const data = await fetchTasks();
-      setTasks(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load tasks.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    setMockActive(tasksUseMocks() && !getStoredAuth()?.token);
-    void load();
-  }, [load]);
+  const error =
+    actionError ??
+    (queryError instanceof Error
+      ? queryError.message
+      : queryError
+        ? "Could not load tasks."
+        : null);
 
   const openCreate = () => {
     setDialogMode("create");
@@ -85,27 +78,29 @@ export function TasksPanel() {
 
   const handleMoveKanban = async (taskId: string, status: TaskBoardStatus) => {
     try {
+      setActionError(null);
       if (mockActive && isMockTaskId(taskId)) {
-        setTasks((prev) =>
-          prev.map((t) => (t.id === taskId ? { ...t, status } : t)),
-        );
+        setLocalTasks((prev) => {
+          const base = prev ?? queryTasks;
+          return base.map((t) => (t.id === taskId ? { ...t, status } : t));
+        });
         return;
       }
-      await updateTask(taskId, { status });
-      await load();
+      await updateTaskMutation.mutateAsync({ id: taskId, input: { status } });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not update task.");
+      setActionError(e instanceof Error ? e.message : "Could not update task.");
     }
   };
 
   function mergePersistedTask(updated: ApiTask) {
-    setTasks((prev) => {
-      const idx = prev.findIndex((t) => t.id === updated.id);
+    setLocalTasks((prev) => {
+      const base = prev ?? queryTasks;
+      const idx = base.findIndex((t) => t.id === updated.id);
       const next =
         idx === -1
-          ? [...prev, updated]
-          : prev.map((t, i) => (i === idx ? updated : t));
-      return [...next].sort((a, b) => a.startDate.localeCompare(b.startDate));
+          ? [...base, updated]
+          : base.map((t, i) => (i === idx ? updated : t));
+      return [...next].sort((a, b) => a.name.localeCompare(b.name));
     });
   }
 
@@ -194,7 +189,7 @@ export function TasksPanel() {
         </p>
       ) : null}
 
-      {loading ? (
+      {loading || isPending ? (
         <p className="text-sm text-zinc-600 dark:text-zinc-400">Loading…</p>
       ) : tasks.length === 0 ? (
         <p className="text-md text-zinc-600 dark:text-zinc-400">
@@ -234,7 +229,7 @@ export function TasksPanel() {
         onMockPersist={mergePersistedTask}
         onClose={() => setDialogOpen(false)}
         onSaved={() => {
-          if (!mockActive) void load();
+          setActionError(null);
         }}
       />
     </div>

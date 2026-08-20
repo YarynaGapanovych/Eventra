@@ -72,12 +72,21 @@ function KanbanCard({
         <p className="font-medium text-zinc-900 dark:text-zinc-50">
           {task.name}
         </p>
-        {task.source === "google" ? (
-          <span className="mt-1 w-fit rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
-            Google
-          </span>
-        ) : null}
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
+          {task.events.length > 0 ? (
+            <>
+              <span>
+                {task.events.length} block
+                {task.events.length === 1 ? "" : "s"}
+              </span>
+              <span aria-hidden>·</span>
+            </>
+          ) : (
+            <>
+              <span>Unscheduled</span>
+              <span aria-hidden>·</span>
+            </>
+          )}
           <span>{TASK_PRIORITY_LABELS[task.priority]}</span>
           <span aria-hidden>·</span>
           <span>

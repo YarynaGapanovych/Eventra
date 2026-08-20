@@ -1,3 +1,4 @@
+import { getStoredAuth } from "@/lib/auth-storage";
 import { API_BASE } from "@/lib/tasks-api";
 
 type GraphqlResponse<T> = {
@@ -10,11 +11,12 @@ export async function graphqlRequest<T>(
   variables?: Record<string, unknown>,
   token?: string,
 ): Promise<T> {
+  const accessToken = token ?? getStoredAuth()?.token;
   const res = await fetch(`${API_BASE}/graphql`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
     body: JSON.stringify({ query, variables }),
   });
