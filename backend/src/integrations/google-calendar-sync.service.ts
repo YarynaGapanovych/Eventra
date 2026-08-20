@@ -1,5 +1,9 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { EventSource } from '../generated/prisma/client';
+import {
+  EventSource,
+  EventVisibility,
+  GuestResponse,
+} from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { GoogleCalendarIntegrationService } from './google-calendar-integration.service';
 import {
@@ -13,9 +17,27 @@ type GoogleCalendarEvent = {
   id?: string;
   status?: string;
   summary?: string;
+  description?: string;
+  location?: string;
   colorId?: string;
-  start?: { dateTime?: string; date?: string };
-  end?: { dateTime?: string; date?: string };
+  hangoutLink?: string;
+  transparency?: string;
+  visibility?: string;
+  recurrence?: string[];
+  start?: { dateTime?: string; date?: string; timeZone?: string };
+  end?: { dateTime?: string; date?: string; timeZone?: string };
+  attendees?: {
+    email?: string;
+    displayName?: string;
+    responseStatus?: string;
+  }[];
+  reminders?: {
+    useDefault?: boolean;
+    overrides?: { method?: string; minutes?: number }[];
+  };
+  conferenceData?: {
+    entryPoints?: { entryPointType?: string; uri?: string }[];
+  };
 };
 
 type GoogleEventsListResponse = {
@@ -78,23 +100,49 @@ export class GoogleCalendarSyncService {
       if (!mapped) continue;
 
       seenIds.add(event.id);
-      await this.prisma.event.upsert({
+      const { guests, reminders, ...scalars } = mapped;
+      const row = await this.prisma.event.upsert({
         where: {
           userId_googleEventId: {
             userId,
             googleEventId: event.id,
           },
         },
-        create: mapped,
+        create: scalars,
         update: {
-          title: mapped.title,
-          start: mapped.start,
-          end: mapped.end,
-          color: mapped.color,
+          title: scalars.title,
+          start: scalars.start,
+          end: scalars.end,
+          color: scalars.color,
           source: EventSource.google,
           taskId: null,
+          location: scalars.location,
+          description: scalars.description,
+          allDay: scalars.allDay,
+          timezone: scalars.timezone,
+          recurrence: scalars.recurrence,
+          busy: scalars.busy,
+          visibility: scalars.visibility,
+          conferenceUrl: scalars.conferenceUrl,
         },
       });
+      await this.prisma.eventGuest.deleteMany({ where: { eventId: row.id } });
+      if (guests.length > 0) {
+        await this.prisma.eventGuest.createMany({
+          data: guests.map((guest) => ({ ...guest, eventId: row.id })),
+        });
+      }
+      await this.prisma.eventReminder.deleteMany({
+        where: { eventId: row.id },
+      });
+      if (reminders.length > 0) {
+        await this.prisma.eventReminder.createMany({
+          data: reminders.map((reminder) => ({
+            ...reminder,
+            eventId: row.id,
+          })),
+        });
+      }
       imported += 1;
     }
 
@@ -247,9 +295,20 @@ export class GoogleCalendarSyncService {
     source: EventSource;
     color: string;
     taskId: null;
+    location: string | null;
+    description: string | null;
+    allDay: boolean;
+    timezone: string | null;
+    recurrence: string | null;
+    busy: boolean;
+    visibility: EventVisibility;
+    conferenceUrl: string | null;
+    guests: { email: string; name: string | null; response: GuestResponse }[];
+    reminders: { minutesBefore: number }[];
   } | null {
     if (!event.id) return null;
 
+    const allDay = Boolean(event.start?.date && !event.start?.dateTime);
     const start = this.parseGoogleDate(event.start);
     const end = this.parseGoogleDate(event.end, true);
     if (!start || !end) return null;
@@ -267,7 +326,96 @@ export class GoogleCalendarSyncService {
         colors.calendarColor,
       ),
       taskId: null,
+      location: event.location?.trim() || null,
+      description: event.description?.trim() || null,
+      allDay,
+      timezone: event.start?.timeZone?.trim() || null,
+      recurrence: this.mapRecurrence(event.recurrence),
+      busy: event.transparency !== 'transparent',
+      visibility: this.mapVisibility(event.visibility),
+      conferenceUrl: this.mapConferenceUrl(event),
+      guests: this.mapAttendees(event.attendees),
+      reminders: this.mapReminders(event.reminders),
     };
+  }
+
+  private mapRecurrence(recurrence?: string[]): string | null {
+    if (!recurrence?.length) return null;
+    const rule = recurrence.find((line) =>
+      line.toUpperCase().startsWith('RRULE:'),
+    );
+    if (!rule) return recurrence[0] ?? null;
+    return rule.replace(/^RRULE:/i, '');
+  }
+
+  private mapVisibility(value?: string): EventVisibility {
+    if (value === 'public') return EventVisibility.public;
+    if (value === 'private' || value === 'confidential') {
+      return EventVisibility.private;
+    }
+    return EventVisibility.default;
+  }
+
+  private mapConferenceUrl(event: GoogleCalendarEvent): string | null {
+    const hangout = event.hangoutLink?.trim();
+    if (hangout) return hangout;
+    const video = event.conferenceData?.entryPoints?.find(
+      (entry) => entry.entryPointType === 'video' && entry.uri,
+    );
+    return video?.uri?.trim() || null;
+  }
+
+  private mapAttendees(
+    attendees?: GoogleCalendarEvent['attendees'],
+  ): { email: string; name: string | null; response: GuestResponse }[] {
+    if (!attendees?.length) return [];
+    const seen = new Set<string>();
+    const rows: {
+      email: string;
+      name: string | null;
+      response: GuestResponse;
+    }[] = [];
+    for (const attendee of attendees) {
+      const email = attendee.email?.trim().toLowerCase();
+      if (!email || seen.has(email)) continue;
+      seen.add(email);
+      rows.push({
+        email,
+        name: attendee.displayName?.trim() || null,
+        response: this.mapGuestResponse(attendee.responseStatus),
+      });
+    }
+    return rows;
+  }
+
+  private mapGuestResponse(value?: string): GuestResponse {
+    if (value === 'accepted') return GuestResponse.accepted;
+    if (value === 'declined') return GuestResponse.declined;
+    if (value === 'tentative') return GuestResponse.tentative;
+    return GuestResponse.needsAction;
+  }
+
+  private mapReminders(
+    reminders?: GoogleCalendarEvent['reminders'],
+  ): { minutesBefore: number }[] {
+    const overrides = reminders?.overrides ?? [];
+    const fromOverrides = overrides
+      .map((item) => item.minutes)
+      .filter(
+        (minutes): minutes is number =>
+          typeof minutes === 'number' &&
+          Number.isInteger(minutes) &&
+          minutes >= 0,
+      );
+    if (fromOverrides.length > 0) {
+      return [...new Set(fromOverrides)].map((minutesBefore) => ({
+        minutesBefore,
+      }));
+    }
+    if (reminders?.useDefault) {
+      return [{ minutesBefore: 10 }];
+    }
+    return [];
   }
 
   private parseGoogleDate(

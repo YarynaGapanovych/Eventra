@@ -3,8 +3,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import type { Event as PrismaEvent } from '../generated/prisma/client';
-import { EventSource, TaskBoardStatus } from '../generated/prisma/client';
+import {
+  EventSource,
+  TaskBoardStatus,
+  type Prisma,
+} from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
   CreateEventInput,
@@ -12,17 +15,36 @@ import type {
   ScheduleTaskInput,
   UpdateEventInput,
 } from './event.types';
+import {
+  assertRange,
+  calendarDataFromTask,
+  calendarScalarData,
+  EVENT_DETAIL_INCLUDE,
+  expandRecurringEvent,
+  expansionWindow,
+  guestCreateData,
+  nestedGuestReminderCreate,
+  parseIsoDate,
+  parseMasterEventId,
+  parseRange,
+  reminderCreateData,
+  TASK_DETAIL_INCLUDE,
+  toEventDto,
+  type EventWithDetails,
+} from '../calendar/calendar-fields';
 
 @Injectable()
 export class EventsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listForUser(userId: string): Promise<Event[]> {
-    const settings = await this.prisma.userSettings.findUnique({
-      where: { userId },
-    });
+    const [settings, integration] = await Promise.all([
+      this.prisma.userSettings.findUnique({ where: { userId } }),
+      this.prisma.googleCalendarIntegration.findUnique({ where: { userId } }),
+    ]);
     const showPastDone = settings?.showPastDoneTaskEvents ?? true;
     const now = new Date();
+    const window = expansionWindow(integration);
 
     const rows = await this.prisma.event.findMany({
       where: {
@@ -38,9 +60,13 @@ export class EventsService {
               },
             }),
       },
+      include: EVENT_DETAIL_INCLUDE,
       orderBy: { start: 'asc' },
     });
-    return rows.map((event) => this.toDto(event));
+
+    return rows
+      .flatMap((event) => expandRecurringEvent(event, window.start, window.end))
+      .sort((a, b) => a.start.localeCompare(b.start));
   }
 
   async createForUser(userId: string, input: CreateEventInput): Promise<Event> {
@@ -52,10 +78,12 @@ export class EventsService {
         start,
         end,
         source: EventSource.eventra,
-        color: normalizeHexColor(input.color),
+        ...calendarScalarData(input),
+        ...nestedGuestReminderCreate(input),
       },
+      include: EVENT_DETAIL_INCLUDE,
     });
-    return this.toDto(created);
+    return toEventDto(created);
   }
 
   async updateForUser(
@@ -63,8 +91,10 @@ export class EventsService {
     id: string,
     input: UpdateEventInput,
   ): Promise<Event> {
+    const { masterId, instanceStart } = parseMasterEventId(id);
     const existing = await this.prisma.event.findFirst({
-      where: { id, userId },
+      where: { id: masterId, userId },
+      include: EVENT_DETAIL_INCLUDE,
     });
     if (!existing) {
       throw new NotFoundException('Event not found');
@@ -75,30 +105,60 @@ export class EventsService {
       );
     }
 
-    const start = input.start
-      ? parseIsoDate(input.start, 'start')
-      : existing.start;
-    const end = input.end ? parseIsoDate(input.end, 'end') : existing.end;
-    assertRange(start, end);
+    let start = existing.start;
+    let end = existing.end;
+    if (input.start || input.end) {
+      const nextStart = input.start
+        ? parseIsoDate(input.start, 'start')
+        : instanceStart ?? existing.start;
+      const nextEnd = input.end ? parseIsoDate(input.end, 'end') : existing.end;
+      assertRange(nextStart, nextEnd);
+      if (instanceStart) {
+        const delta = nextStart.getTime() - instanceStart.getTime();
+        start = new Date(existing.start.getTime() + delta);
+        end = new Date(start.getTime() + (nextEnd.getTime() - nextStart.getTime()));
+      } else {
+        start = nextStart;
+        end = input.end ? nextEnd : new Date(
+          start.getTime() + (existing.end.getTime() - existing.start.getTime()),
+        );
+      }
+      assertRange(start, end);
+    }
 
-    const updated = await this.prisma.event.update({
-      where: { id },
-      data: {
-        title: input.title?.trim() ?? existing.title,
-        start,
-        end,
-        color:
-          input.color !== undefined
-            ? normalizeHexColor(input.color)
-            : existing.color,
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.event.update({
+        where: { id: existing.id },
+        data: {
+          title: input.title?.trim() ?? existing.title,
+          start,
+          end,
+          ...calendarScalarData(input),
+        },
+        include: EVENT_DETAIL_INCLUDE,
+      });
+
+      if (input.guests !== undefined || input.reminders !== undefined) {
+        await replaceEventGuestsReminders(tx, row.id, input);
+      }
+
+      if (row.taskId) {
+        await syncTaskFromEvent(tx, row, input);
+      }
+
+      return tx.event.findFirstOrThrow({
+        where: { id: row.id },
+        include: EVENT_DETAIL_INCLUDE,
+      });
     });
-    return this.toDto(updated);
+
+    return toEventDto(updated);
   }
 
   async deleteForUser(userId: string, id: string): Promise<boolean> {
+    const { masterId } = parseMasterEventId(id);
     const existing = await this.prisma.event.findFirst({
-      where: { id, userId },
+      where: { id: masterId, userId },
     });
     if (!existing) {
       throw new NotFoundException('Event not found');
@@ -108,7 +168,7 @@ export class EventsService {
         'Google Calendar events cannot be deleted in Eventra.',
       );
     }
-    await this.prisma.event.delete({ where: { id } });
+    await this.prisma.event.delete({ where: { id: existing.id } });
     return true;
   }
 
@@ -118,6 +178,7 @@ export class EventsService {
   ): Promise<Event> {
     const task = await this.prisma.task.findFirst({
       where: { id: input.taskId, userId },
+      include: TASK_DETAIL_INCLUDE,
     });
     if (!task) {
       throw new NotFoundException('Task not found');
@@ -135,50 +196,90 @@ export class EventsService {
         end,
         source: EventSource.eventra,
         taskId: task.id,
+        ...calendarDataFromTask(task),
       },
+      include: EVENT_DETAIL_INCLUDE,
     });
-    return this.toDto(created);
-  }
 
-  private toDto(event: PrismaEvent): Event {
-    return {
-      id: event.id,
-      title: event.title,
-      start: event.start.toISOString(),
-      end: event.end.toISOString(),
-      source: event.source,
-      googleEventId: event.googleEventId,
+    await this.prisma.task.update({
+      where: { id: task.id },
+      data: { start, end },
+    });
+
+    return toEventDto(created);
+  }
+}
+
+type PrismaTx = Prisma.TransactionClient;
+
+async function replaceEventGuestsReminders(
+  tx: PrismaTx,
+  eventId: string,
+  input: UpdateEventInput,
+): Promise<void> {
+  if (input.guests !== undefined) {
+    await tx.eventGuest.deleteMany({ where: { eventId } });
+    const rows = guestCreateData(input.guests);
+    if (rows.length > 0) {
+      await tx.eventGuest.createMany({
+        data: rows.map((row) => ({ ...row, eventId })),
+      });
+    }
+  }
+  if (input.reminders !== undefined) {
+    await tx.eventReminder.deleteMany({ where: { eventId } });
+    const rows = reminderCreateData(input.reminders);
+    if (rows.length > 0) {
+      await tx.eventReminder.createMany({
+        data: rows.map((row) => ({ ...row, eventId })),
+      });
+    }
+  }
+}
+
+async function syncTaskFromEvent(
+  tx: PrismaTx,
+  event: EventWithDetails,
+  input: UpdateEventInput,
+): Promise<void> {
+  if (!event.taskId) return;
+  await tx.task.update({
+    where: { id: event.taskId },
+    data: {
+      name: event.title,
+      location: event.location,
+      description: event.description,
+      allDay: event.allDay,
+      timezone: event.timezone,
+      recurrence: event.recurrence,
+      busy: event.busy,
+      visibility: event.visibility,
+      conferenceUrl: event.conferenceUrl,
       color: event.color,
-      taskId: event.taskId,
-    };
+      guestCanModify: event.guestCanModify,
+      guestCanInvite: event.guestCanInvite,
+      guestCanSeeOthers: event.guestCanSeeOthers,
+      start: event.start,
+      end: event.end,
+    },
+  });
+
+  if (input.guests !== undefined) {
+    await tx.taskGuest.deleteMany({ where: { taskId: event.taskId } });
+    const rows = guestCreateData(input.guests);
+    if (rows.length > 0) {
+      await tx.taskGuest.createMany({
+        data: rows.map((row) => ({ ...row, taskId: event.taskId! })),
+      });
+    }
   }
-}
-
-function normalizeHexColor(value?: string): string | null {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed.toUpperCase() : null;
-}
-
-function parseIsoDate(value: string, field: string): Date {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    throw new BadRequestException(`${field} is invalid`);
+  if (input.reminders !== undefined) {
+    await tx.taskReminder.deleteMany({ where: { taskId: event.taskId } });
+    const rows = reminderCreateData(input.reminders);
+    if (rows.length > 0) {
+      await tx.taskReminder.createMany({
+        data: rows.map((row) => ({ ...row, taskId: event.taskId! })),
+      });
+    }
   }
-  return parsed;
-}
-
-function assertRange(start: Date, end: Date): void {
-  if (end.getTime() < start.getTime()) {
-    throw new BadRequestException('End must be after start.');
-  }
-}
-
-function parseRange(
-  startValue: string,
-  endValue: string,
-): { start: Date; end: Date } {
-  const start = parseIsoDate(startValue, 'start');
-  const end = parseIsoDate(endValue, 'end');
-  assertRange(start, end);
-  return { start, end };
 }
