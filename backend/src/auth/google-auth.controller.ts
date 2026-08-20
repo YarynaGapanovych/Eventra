@@ -1,9 +1,7 @@
 import {
   BadRequestException,
-  Body,
   Controller,
   Get,
-  Post,
   Query,
   Res,
   ServiceUnavailableException,
@@ -132,15 +130,6 @@ export class GoogleAuthController {
       );
       res.redirect(url.toString());
     }
-  }
-
-  @Post('complete')
-  async complete(@Body('code') code: string) {
-    if (!code?.trim()) {
-      throw new BadRequestException('code is required');
-    }
-    const payload = await this.authService.completeGoogleExchange(code.trim());
-    return payload;
   }
 
   private getCallbackUri(): string {

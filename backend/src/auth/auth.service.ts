@@ -97,6 +97,14 @@ export class AuthService {
     return this.signTokensFromUserId(payload.sub);
   }
 
+  async me(userId: string): Promise<AuthPayloadGql['user']> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    return { id: user.id, email: user.email, name: user.name };
+  }
+
   private async signTokensFromUserId(userId: string): Promise<AuthPayloadGql> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {

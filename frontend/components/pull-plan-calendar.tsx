@@ -1,32 +1,81 @@
 "use client";
 
 import { CalendarCreateEventModal } from "@/components/calendar-create-event-modal";
+import { CalendarEventDetailModal } from "@/components/calendar-event-detail-modal";
+import {
+  EventCreateColorProvider,
+  useEventCreateDraft,
+} from "@/components/event-create-color-context";
 import { Button } from "@/components/ui/button";
-import { loadAppSettings } from "@/lib/app-settings";
 import { getStoredAuth } from "@/lib/auth-api";
 import {
-  fetchGoogleCalendarStatus,
-  syncGoogleCalendar,
-} from "@/lib/google-calendar-sync";
-import { createTask, fetchTasks, type ApiTask } from "@/lib/tasks-api";
-import { cn } from "@/lib/utils";
-import dayjs from "dayjs";
-import { CalendarPlus, ChevronLeft, ChevronRight, Eye, X } from "lucide-react";
+  useGoogleCalendarStatusQuery,
+  useSyncGoogleCalendarMutation,
+} from "@/hooks/use-google-calendar";
 import {
-  CalendarContainer,
+  useCreateEventMutation,
+  useEventsQuery,
+  useScheduleTaskMutation,
+  useUpdateEventMutation,
+} from "@/hooks/use-events";
+import { useTasksQuery } from "@/hooks/use-tasks";
+import { parseMasterEventId } from "@/lib/calendar-details";
+import { type ApiEvent } from "@/lib/events-api";
+import {
+  eventContrastText,
+  GOOGLE_EVENT_COLOR_FALLBACK,
+  TASK_BLOCK_COLOR,
+  toGoogleDisplayColor,
+} from "@/lib/event-colors";
+import { syncEntityReminders } from "@/lib/reminder-storage";
+import { type ApiTask } from "@/lib/tasks-api";
+import dayjs from "dayjs";
+import { CalendarPlus, ChevronLeft, ChevronRight, Eye } from "lucide-react";
+import {
+  Calendar,
   mapEventToTask,
-  mapTaskToEvent,
   ProgressStatus,
-  type Area,
   type CalendarEvent,
+  type CalendarEventCreatePayload,
+  type CalendarEventMovePayload,
+  type CalendarEventResizePayload,
+  type CalendarViewMode,
   type Task,
-  type TaskModalProps,
 } from "pull-plan-calendar";
 import "pull-plan-calendar/dist/calendar.css";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 const calendarNavIconClass = "size-4 shrink-0";
-const GOOGLE_EVENT_COLOR = "#4285F4";
+const CALENDAR_VIEW_STORAGE_KEY = "eventra.calendar.view.v1";
+const UNSCHEDULED_PREFIX = "task:";
+const CALENDAR_VIEWS: readonly CalendarViewMode[] = [
+  "day",
+  "week",
+  "month",
+  "year",
+];
+
+function isCalendarViewMode(value: string): value is CalendarViewMode {
+  return (CALENDAR_VIEWS as readonly string[]).includes(value);
+}
+
+function readStoredCalendarView(): CalendarViewMode {
+  try {
+    const stored = window.localStorage.getItem(CALENDAR_VIEW_STORAGE_KEY);
+    if (stored && isCalendarViewMode(stored)) return stored;
+  } catch {
+    /* ignore */
+  }
+  return "day";
+}
+
+function writeStoredCalendarView(view: CalendarViewMode): void {
+  try {
+    window.localStorage.setItem(CALENDAR_VIEW_STORAGE_KEY, view);
+  } catch {
+    /* ignore */
+  }
+}
 
 function CalendarAddEventButton({ onClick }: { onClick: () => void }) {
   return (
@@ -63,185 +112,239 @@ function CalendarEventActionButton({
   );
 }
 
-function CalendarEventDetailModal({
-  task,
-  isOpen,
-  onClose,
-  className,
-}: TaskModalProps) {
-  if (!isOpen) return null;
-
-  return (
-    <div
-      className={cn(
-        "fixed inset-0 z-50 flex items-center justify-center p-4",
-        className,
-      )}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="calendar-task-detail-title"
-    >
-      <Button
-        type="button"
-        variant="ghost"
-        aria-label="Close"
-        onClick={onClose}
-        className="absolute inset-0 z-0 h-full min-h-0 w-full cursor-default rounded-none border-0 bg-zinc-950/40 p-0 shadow-none ring-0 backdrop-blur-sm hover:bg-zinc-950/45 focus-visible:ring-0 dark:bg-black/50 dark:hover:bg-black/55"
-      />
-      <div className="relative z-10 w-full max-w-md rounded-xl border border-zinc-200 bg-white p-6 shadow-lg dark:border-zinc-800 dark:bg-zinc-950">
-        <div className="flex items-start justify-between gap-3">
-          <h2
-            id="calendar-task-detail-title"
-            className="text-lg font-semibold text-zinc-900 dark:text-zinc-50"
-          >
-            Task details
-          </h2>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="shrink-0"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            <X className="size-4" aria-hidden />
-          </Button>
-        </div>
-        <p className="mt-3 font-medium text-zinc-900 dark:text-zinc-50">
-          {task.name}
-        </p>
-        {task.source === "google" ? (
-          <p className="mt-1 text-xs font-medium text-[#4285F4]">
-            Google Calendar
-          </p>
-        ) : null}
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          Start: {dayjs(task.startDate).format("MMM D, YYYY")}
-        </p>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          End: {dayjs(task.endDate).format("MMM D, YYYY")}
-        </p>
-        <div className="mt-6 flex justify-end">
-          <Button type="button" variant="outline" onClick={onClose}>
-            Close
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
+function scheduledEventColor(event: ApiEvent): string | undefined {
+  const stored = toGoogleDisplayColor(event.color);
+  if (stored) return stored;
+  if (event.source === "google") return GOOGLE_EVENT_COLOR_FALLBACK;
+  if (event.taskId) return TASK_BLOCK_COLOR;
+  return undefined;
 }
 
-const MOCK_AREAS: Area[] = [
-  { id: "area-1", name: "Production" },
-  { id: "area-2", name: "Assembly" },
-];
-
-function apiTaskToLibraryTask(t: ApiTask): Task {
-  const status = Object.values(ProgressStatus).includes(
-    t.progressStatus as ProgressStatus,
-  )
-    ? (t.progressStatus as ProgressStatus)
-    : ProgressStatus.NOT_STARTED;
-
+function toScheduledCalendarEvent(event: ApiEvent): CalendarEvent {
+  const color = scheduledEventColor(event);
   return {
-    id: t.id,
-    name: t.name,
-    startDate: dayjs(t.startDate),
-    endDate: dayjs(t.endDate),
-    employees: t.employees.map((e) => ({
-      id: e.id,
-      name: e.name ?? undefined,
-    })),
-    progressStatus: status,
-    source: t.source,
+    id: event.id,
+    title: event.title,
+    start: dayjs(event.start),
+    end: dayjs(event.end),
+    color,
+    meta: {
+      source: event.source,
+      taskId: event.taskId,
+      kind: event.taskId ? "task-block" : "event",
+      color,
+    },
   };
 }
 
-function toCalendarEvent(task: ApiTask): CalendarEvent {
-  const event = mapTaskToEvent(apiTaskToLibraryTask(task));
-  if (task.source === "google") {
-    return { ...event, color: GOOGLE_EVENT_COLOR };
-  }
-  return event;
+function toUnscheduledCalendarEvent(task: ApiTask): CalendarEvent {
+  const now = dayjs();
+  return {
+    id: `${UNSCHEDULED_PREFIX}${task.id}`,
+    title: task.name,
+    start: now,
+    end: now.add(1, "hour"),
+    meta: {
+      kind: "unscheduled-task",
+      taskId: task.id,
+      source: "eventra",
+    },
+  };
+}
+
+function mapCalendarEventToLibraryTask(event: CalendarEvent): Task {
+  const mapped = mapEventToTask(event);
+  const metaColor =
+    typeof event.meta?.color === "string" ? event.meta.color : undefined;
+  return {
+    ...mapped,
+    progressStatus: ProgressStatus.NOT_STARTED,
+    source: event.meta?.source,
+    kind: event.meta?.kind,
+    taskId: event.meta?.taskId,
+    color: event.color ?? metaColor,
+  };
+}
+
+function unscheduledTaskId(calendarEventId: string): string | null {
+  if (!calendarEventId.startsWith(UNSCHEDULED_PREFIX)) return null;
+  return calendarEventId.slice(UNSCHEDULED_PREFIX.length);
+}
+
+/** Day/month/year views ignore event.color and use CSS --event-color instead. */
+function eventColorCss(events: CalendarEvent[]): string {
+  return events
+    .map((event) => {
+      const color = toGoogleDisplayColor(event.color);
+      if (!color) return "";
+      const text = eventContrastText(color);
+      return `[data-slot="event"][data-event-id="${CSS.escape(event.id)}"]{--event-color:${color};color:${text}}`;
+    })
+    .filter(Boolean)
+    .join("");
 }
 
 export function PullPlanCalendar() {
-  const [tasks, setTasks] = useState<ApiTask[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-  const [lastSynced, setLastSynced] = useState<Date | null>(null);
+  return (
+    <EventCreateColorProvider>
+      <PullPlanCalendarView />
+    </EventCreateColorProvider>
+  );
+}
 
-  const load = useCallback(async () => {
-    try {
-      setError(null);
-      const data = await fetchTasks();
-      setTasks(data);
-      setLastSynced(new Date());
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load tasks");
-    }
+function PullPlanCalendarView() {
+  const [view, setView] = useState<CalendarViewMode>("day");
+  const [actionError, setActionError] = useState<string | null>(null);
+  const calendarRootRef = useRef<HTMLDivElement>(null);
+  const {
+    data: tasks = [],
+    error: tasksError,
+  } = useTasksQuery({ refetchInterval: 2500 });
+  const {
+    data: events = [],
+    error: eventsError,
+  } = useEventsQuery({ refetchInterval: 2500 });
+  const calendarStatusQuery = useGoogleCalendarStatusQuery();
+  const syncMutation = useSyncGoogleCalendarMutation();
+  const createEventMutation = useCreateEventMutation();
+  const updateEventMutation = useUpdateEventMutation();
+  const scheduleTaskMutation = useScheduleTaskMutation();
+  const initialSyncStarted = useRef(false);
+  const error =
+    actionError ??
+    (tasksError instanceof Error
+      ? tasksError.message
+      : tasksError
+        ? "Failed to load tasks"
+        : eventsError instanceof Error
+          ? eventsError.message
+          : eventsError
+            ? "Failed to load events"
+            : null);
+
+  useLayoutEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- hydrate calendar view from localStorage */
+    setView(readStoredCalendarView());
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
   useEffect(() => {
-    void load();
-    const t = setInterval(() => void load(), 2500);
-    return () => clearInterval(t);
-  }, [load]);
-
-  useEffect(() => {
     const token = getStoredAuth()?.token;
-    if (!token) return;
-
-    let cancelled = false;
-    void (async () => {
-      try {
-        const status = await fetchGoogleCalendarStatus(token);
-        if (cancelled || !status.connected || status.lastSyncedAt) return;
-        await syncGoogleCalendar(token);
-        if (!cancelled) await load();
-      } catch (err) {
-        if (!cancelled) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Google Calendar sync failed",
-          );
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [load]);
+    const status = calendarStatusQuery.data;
+    if (!token || !status?.connected || status.lastSyncedAt) return;
+    if (initialSyncStarted.current) return;
+    initialSyncStarted.current = true;
+    void syncMutation.mutateAsync().catch((err: unknown) => {
+      setActionError(
+        err instanceof Error ? err.message : "Google Calendar sync failed",
+      );
+    });
+  }, [calendarStatusQuery.data, syncMutation]);
 
   const { scheduledEvents, unscheduledEvents } = useMemo(() => {
-    const scheduled = tasks.filter((t) => t.scheduled);
-    const unscheduled = tasks.filter((t) => !t.scheduled);
+    const unscheduled = tasks.filter((t) => (t.events?.length ?? 0) === 0);
     return {
-      scheduledEvents: scheduled.map(toCalendarEvent),
-      unscheduledEvents: unscheduled.map(toCalendarEvent),
+      scheduledEvents: events.map(toScheduledCalendarEvent),
+      unscheduledEvents: unscheduled.map(toUnscheduledCalendarEvent),
     };
-  }, [tasks]);
+  }, [events, tasks]);
 
-  const calendarKey = tasks.map((t) => t.id).join(",");
+  const { getDraft, setDraft } = useEventCreateDraft();
+  const calendarKey = `${events
+    .map((e) => `${e.id}:${e.color ?? ""}`)
+    .join(",")}|${tasks.map((t) => t.id).join(",")}`;
+  const eventColorsCss = useMemo(
+    () => eventColorCss(scheduledEvents),
+    [scheduledEvents],
+  );
 
-  async function handleCreateDemo() {
-    setPending(true);
-    setError(null);
+  useEffect(() => {
+    const root = calendarRootRef.current;
+    if (!root) return;
+    const selected = root.querySelector(
+      '[data-slot="segmented-control-option"][aria-selected="true"]',
+    );
+    const current = selected?.getAttribute("data-value");
+    if (current === view) return;
+    const button = root.querySelector(
+      `[data-slot="segmented-control-option"][data-value="${view}"]`,
+    );
+    if (!(button instanceof HTMLElement)) return;
+    button.click();
+  }, [view, calendarKey]);
+
+  async function handleEventCreate(payload: CalendarEventCreatePayload) {
+    setActionError(null);
     try {
-      const start = dayjs().add(1, "hour").startOf("hour");
-      const mins = loadAppSettings().defaultEventDurationMinutes;
-      await createTask({
-        name: `Demo task ${start.format("HH:mm")}`,
-        startDate: start.toISOString(),
-        endDate: start.add(Math.max(15, mins), "minute").toISOString(),
+      const draft = getDraft();
+      const created = await createEventMutation.mutateAsync({
+        title: payload.title.trim() || "Untitled event",
+        start: payload.start.toISOString(),
+        end: payload.end.toISOString(),
+        ...draft,
+        color: draft.color,
       });
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Create failed");
-    } finally {
-      setPending(false);
+      syncEntityReminders({
+        entityId: created.id,
+        title: created.title,
+        startIso: created.start,
+        minutesBefore: created.reminders.map((item) => item.minutesBefore),
+      });
+      setDraft({
+        color: created.color ?? undefined,
+        allDay: false,
+        busy: true,
+        visibility: "default",
+        guestCanModify: false,
+        guestCanInvite: true,
+        guestCanSeeOthers: true,
+        guests: [],
+        reminders: [],
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Could not create event.";
+      setActionError(message);
+      throw err;
+    }
+  }
+
+  async function persistMoveOrResize(
+    payload: CalendarEventMovePayload | CalendarEventResizePayload,
+  ) {
+    const matched =
+      events.find((e) => e.id === payload.id) ??
+      events.find((e) => e.id === parseMasterEventId(payload.id));
+    const source = matched?.source;
+    if (source === "google") {
+      const message = "Google Calendar events cannot be edited in Eventra.";
+      setActionError(message);
+      throw new Error(message);
+    }
+
+    const taskId = unscheduledTaskId(payload.id);
+    setActionError(null);
+    try {
+      if (taskId) {
+        await scheduleTaskMutation.mutateAsync({
+          taskId,
+          start: payload.start.toISOString(),
+          end: payload.end.toISOString(),
+        });
+        return;
+      }
+      await updateEventMutation.mutateAsync({
+        id: payload.id,
+        input: {
+          start: payload.start.toISOString(),
+          end: payload.end.toISOString(),
+        },
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Could not update event.";
+      setActionError(message);
+      throw err;
     }
   }
 
@@ -256,21 +359,32 @@ export function PullPlanCalendar() {
         </p>
       ) : null}
 
-      <CalendarContainer
+      <div
+        ref={calendarRootRef}
+        onClick={(event) => {
+          const target = event.target as HTMLElement | null;
+          const option = target?.closest?.("[data-value]");
+          const clicked = option?.getAttribute("data-value");
+          if (clicked && isCalendarViewMode(clicked)) {
+            setView(clicked);
+            writeStoredCalendarView(clicked);
+          }
+        }}
+      >
+      {eventColorsCss ? <style>{eventColorsCss}</style> : null}
+      <Calendar
         key={calendarKey}
         showSwitcher={true}
-        showTabs={false}
         views={["week", "year", "day", "month"]}
-        areas={MOCK_AREAS}
         defaultScheduledEvents={scheduledEvents}
         defaultUnscheduledEvents={unscheduledEvents}
-        onEventMove={async () => {}}
-        onEventResize={async () => {}}
-        onEventCreate={async () => {}}
+        onEventMove={persistMoveOrResize}
+        onEventResize={persistMoveOrResize}
+        onEventCreate={handleEventCreate}
         onEventClick={async () => {}}
         onDateClick={async () => {}}
         readOnly={false}
-        mapFromEvent={mapEventToTask}
+        mapFromEvent={mapCalendarEventToLibraryTask}
         previousDayButtonContent={
           <ChevronLeft className={calendarNavIconClass} aria-hidden />
         }
@@ -302,6 +416,7 @@ export function PullPlanCalendar() {
         EventActionButton={CalendarEventActionButton}
         EventDetailModal={CalendarEventDetailModal}
       />
+      </div>
     </div>
   );
 }

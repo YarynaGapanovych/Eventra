@@ -1,2 +1,14 @@
 export { LOGIN_MUTATION } from "./login";
 export { REGISTER_MUTATION } from "./register";
+export { CREATE_TASK_MUTATION } from "./create-task";
+export { UPDATE_TASK_MUTATION } from "./update-task";
+export { COMPLETE_GOOGLE_LOGIN_MUTATION } from "./complete-google-login";
+export { START_GOOGLE_CALENDAR_CONNECT_MUTATION } from "./start-google-calendar-connect";
+export { DISCONNECT_GOOGLE_CALENDAR_MUTATION } from "./disconnect-google-calendar";
+export { SYNC_GOOGLE_CALENDAR_MUTATION } from "./sync-google-calendar";
+export { UPDATE_GOOGLE_CALENDAR_SYNC_WINDOW_MUTATION } from "./update-google-calendar-sync-window";
+export { UPDATE_USER_SETTINGS_MUTATION } from "./update-user-settings";
+export { CREATE_EVENT_MUTATION } from "./create-event";
+export { UPDATE_EVENT_MUTATION } from "./update-event";
+export { DELETE_EVENT_MUTATION } from "./delete-event";
+export { SCHEDULE_TASK_MUTATION } from "./schedule-task";

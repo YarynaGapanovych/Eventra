@@ -1,71 +1,31 @@
 import {
   BadRequestException,
-  Body,
   Controller,
   Get,
-  Headers,
   Logger,
-  Patch,
-  Post,
   Query,
   Res,
-  UnauthorizedException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import type { Response } from 'express';
 import { GoogleCalendarIntegrationService } from './google-calendar-integration.service';
-import { GoogleCalendarSyncService } from './google-calendar-sync.service';
 import {
-  clampSyncDaysBack,
-  clampSyncDaysForward,
-} from './google-calendar-sync-window';
+  DEFAULT_FRONTEND_REDIRECT,
+  validateCalendarRedirectUri,
+} from './google-calendar-redirect';
+import { GoogleCalendarSyncService } from './google-calendar-sync.service';
 import { GoogleOAuthService } from './google-oauth.service';
-
-const DEFAULT_FRONTEND_REDIRECT =
-  'http://localhost:3000/settings?google_calendar=callback';
-
-const ALLOWED_REDIRECT_ORIGINS = new Set([
-  'http://localhost:3000',
-  'http://127.0.0.1:3000',
-]);
 
 @Controller('integrations/google-calendar')
 export class GoogleCalendarController {
   private readonly logger = new Logger(GoogleCalendarController.name);
 
   constructor(
-    private readonly config: ConfigService,
     private readonly jwtService: JwtService,
     private readonly googleOAuth: GoogleOAuthService,
     private readonly integrationService: GoogleCalendarIntegrationService,
     private readonly syncService: GoogleCalendarSyncService,
   ) {}
-
-  @Post('start')
-  start(
-    @Headers('authorization') authorization: string | undefined,
-    @Body('redirect_uri') redirectUri?: string,
-  ) {
-    const userId = this.requireUserId(authorization);
-    const safeRedirect = this.validateRedirectUri(
-      redirectUri?.trim() || DEFAULT_FRONTEND_REDIRECT,
-    );
-    const exchange = this.jwtService.sign(
-      { sub: userId, purpose: 'calendar_connect', redirectUri: safeRedirect },
-      { expiresIn: '2m' },
-    );
-    const port = this.config.get<string>('PORT') ?? '3001';
-    const apiBase =
-      this.config.get<string>('API_PUBLIC_URL')?.trim() ||
-      `http://localhost:${port}`;
-    const connectUrl = new URL(
-      `${apiBase.replace(/\/$/, '')}/integrations/google-calendar/connect`,
-    );
-    connectUrl.searchParams.set('exchange', exchange);
-    connectUrl.searchParams.set('redirect_uri', safeRedirect);
-    return { connectUrl: connectUrl.toString() };
-  }
 
   @Get('connect')
   connect(
@@ -75,17 +35,21 @@ export class GoogleCalendarController {
   ): void {
     if (!exchange?.trim()) {
       throw new BadRequestException(
-        'exchange is required. Call POST /integrations/google-calendar/start first.',
+        'exchange is required. Call startGoogleCalendarConnect first.',
       );
     }
 
     const payload = this.verifyExchangeToken(exchange.trim());
-    const safeRedirect = this.validateRedirectUri(
+    const safeRedirect = validateCalendarRedirectUri(
       redirectUri?.trim() || payload.redirectUri || DEFAULT_FRONTEND_REDIRECT,
     );
 
     const state = this.jwtService.sign(
-      { sub: payload.sub, purpose: 'calendar_oauth_state', redirectUri: safeRedirect },
+      {
+        sub: payload.sub,
+        purpose: 'calendar_oauth_state',
+        redirectUri: safeRedirect,
+      },
       { expiresIn: '10m' },
     );
 
@@ -177,58 +141,6 @@ export class GoogleCalendarController {
     }
   }
 
-  @Get('status')
-  async status(@Headers('authorization') authorization?: string) {
-    const userId = this.requireUserId(authorization);
-    return this.integrationService.getStatus(userId);
-  }
-
-  @Post('disconnect')
-  async disconnect(@Headers('authorization') authorization?: string) {
-    const userId = this.requireUserId(authorization);
-    await this.integrationService.disconnect(userId);
-    return { ok: true };
-  }
-
-  @Post('sync')
-  async sync(@Headers('authorization') authorization?: string) {
-    const userId = this.requireUserId(authorization);
-    const result = await this.syncService.syncForUser(userId);
-    return { ok: true, syncedAt: result.syncedAt, imported: result.imported };
-  }
-
-  @Patch('sync-window')
-  async updateSyncWindow(
-    @Headers('authorization') authorization: string | undefined,
-    @Body() body?: { syncDaysBack?: number; syncDaysForward?: number },
-  ) {
-    const userId = this.requireUserId(authorization);
-    return this.integrationService.updateSyncWindow(
-      userId,
-      clampSyncDaysBack(body?.syncDaysBack),
-      clampSyncDaysForward(body?.syncDaysForward),
-    );
-  }
-
-  private requireUserId(authorization?: string): string {
-    const token = authorization?.startsWith('Bearer ')
-      ? authorization.slice(7)
-      : null;
-    if (!token) {
-      throw new UnauthorizedException();
-    }
-    let payload: { sub?: string };
-    try {
-      payload = this.jwtService.verify(token);
-    } catch {
-      throw new UnauthorizedException();
-    }
-    if (!payload.sub) {
-      throw new UnauthorizedException();
-    }
-    return payload.sub;
-  }
-
   private verifyExchangeToken(exchange: string): {
     sub: string;
     redirectUri?: string;
@@ -259,18 +171,5 @@ export class GoogleCalendarController {
       throw new BadRequestException('Invalid or expired OAuth state');
     }
     return { sub: payload.sub, redirectUri: payload.redirectUri };
-  }
-
-  private validateRedirectUri(uri: string): string {
-    let url: URL;
-    try {
-      url = new URL(uri);
-    } catch {
-      throw new BadRequestException('redirect_uri is invalid');
-    }
-    if (!ALLOWED_REDIRECT_ORIGINS.has(url.origin)) {
-      throw new BadRequestException('redirect_uri origin is not allowed');
-    }
-    return url.toString();
   }
 }

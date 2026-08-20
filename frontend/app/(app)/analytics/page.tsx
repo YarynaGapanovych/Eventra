@@ -5,86 +5,380 @@ import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
   CalendarClock,
+  CalendarOff,
   CalendarRange,
-  CheckCircle2,
-  Clock3,
-  TrendingUp,
+  ClipboardList,
+  Repeat,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 
-type StatCardData = {
-  label: string;
-  value: string;
-  change?: string;
-  positive?: boolean;
+const RANGES = ["This week", "Last 7 days", "This month"] as const;
+type AnalyticsRange = (typeof RANGES)[number];
+
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"] as const;
+const WORK_HOURS = [9, 10, 11, 12, 13, 14, 15, 16] as const;
+
+type DayHours = {
+  day: string;
+  booked: number;
+  free: number;
+  capacity: number;
 };
 
-const stats: StatCardData[] = [
-  { label: "Scheduled Hours", value: "38.5h", change: "+8% vs last week", positive: true },
-  { label: "Completed Tasks", value: "27", change: "+5 tasks", positive: true },
-  { label: "Scheduling Conflicts", value: "3", change: "-2 resolved", positive: true },
-  { label: "Average Workload", value: "74%", change: "+4%", positive: false },
-];
+type AttentionItem = {
+  kind: "overlap" | "overload";
+  title: string;
+  detail: string;
+};
 
-const workloadByDay = [
-  { day: "Mon", hours: 6.5 },
-  { day: "Tue", hours: 7.2 },
-  { day: "Wed", hours: 8.6 },
-  { day: "Thu", hours: 6.9 },
-  { day: "Fri", hours: 5.8 },
-  { day: "Sat", hours: 2.4 },
-  { day: "Sun", hours: 1.8 },
-];
+type DeadlineItem = {
+  task: string;
+  due: string;
+  priority: "High" | "Medium" | "Low";
+  overdue: boolean;
+};
 
-const completionTrend = [
-  { label: "Apr 29", completed: 3 },
-  { label: "Apr 30", completed: 4 },
-  { label: "May 1", completed: 5 },
-  { label: "May 2", completed: 2 },
-  { label: "May 3", completed: 6 },
-  { label: "May 4", completed: 4 },
-  { label: "May 5", completed: 7 },
-  { label: "May 6", completed: 5 },
-  { label: "May 7", completed: 8 },
-];
+type FrequentEvent = {
+  title: string;
+  count: number;
+  hours: number;
+};
 
-const timeAllocation = [
-  { name: "Meetings", value: 34, color: "#0f766e" },
-  { name: "Focus Work", value: 42, color: "#334155" },
-  { name: "Admin", value: 14, color: "#64748b" },
-  { name: "Personal", value: 10, color: "#94a3b8" },
-];
+type TasksByDay = {
+  day: string;
+  tasks: number;
+};
 
-const upcomingDeadlines = [
-  { task: "Finalize Q2 roadmap", due: "May 10, 4:00 PM", priority: "High" },
-  { task: "Vendor budget review", due: "May 11, 11:30 AM", priority: "Medium" },
-  { task: "Sprint retrospective prep", due: "May 12, 9:00 AM", priority: "Low" },
-];
+type UnscheduledTask = {
+  task: string;
+  due: string;
+};
 
-const conflicts = [
-  { title: "Overlapping meetings", detail: "Tue 10:00-10:45 and 10:30-11:00 overlap." },
-  { title: "Overloaded day", detail: "Wednesday is booked 9.1 hours with no buffer." },
-];
+type BoardCounts = {
+  todo: number;
+  inProgress: number;
+  done: number;
+};
 
-const quickInsights = [
-  "Wednesday is your busiest day with 8.6 scheduled hours.",
-  "Meeting time increased by 20% from the previous week.",
-  "Tasks completed after 2 PM have the highest completion rate.",
-];
+type RangeSnapshot = {
+  hoursByDay: DayHours[];
+  peakMinutes: number[][];
+  busiest: { day: string; slot: string };
+  frequent: FrequentEvent[];
+  tasksByDay: TasksByDay[];
+  avgTasksPerWorkday: number;
+  attention: AttentionItem[];
+  deadlines: DeadlineItem[];
+  unscheduledHigh: UnscheduledTask[];
+};
+
+const BOARD: BoardCounts = { todo: 5, inProgress: 3, done: 4 };
+const DEADLINE_LIMIT = 5;
+const FREQUENT_LIMIT = 5;
+const UNSCHEDULED_LIMIT = 5;
+
+function dayLoad(day: string, booked: number, capacity: number): DayHours {
+  return {
+    day,
+    booked,
+    capacity,
+    free: Math.max(0, Math.round((capacity - booked) * 10) / 10),
+  };
+}
+
+const SNAPSHOTS: Record<AnalyticsRange, RangeSnapshot> = {
+  "This week": {
+    hoursByDay: [
+      dayLoad("Mon", 6.5, 8),
+      dayLoad("Tue", 8.2, 8),
+      dayLoad("Wed", 9.1, 8),
+      dayLoad("Thu", 6, 8),
+      dayLoad("Fri", 5.2, 8),
+      dayLoad("Sat", 2, 0),
+      dayLoad("Sun", 0, 0),
+    ],
+    peakMinutes: [
+      [20, 45, 30, 15, 50, 40, 10, 0],
+      [40, 55, 60, 35, 50, 45, 25, 10],
+      [50, 60, 60, 45, 55, 50, 40, 20],
+      [15, 50, 25, 10, 40, 30, 20, 5],
+      [10, 20, 35, 15, 40, 25, 15, 0],
+    ],
+    busiest: { day: "Wed", slot: "10:00–11:00" },
+    frequent: [
+      { title: "Team standup", count: 4, hours: 2 },
+      { title: "Design sync", count: 3, hours: 4.5 },
+      { title: "1:1", count: 2, hours: 1.5 },
+      { title: "API review", count: 2, hours: 2 },
+      { title: "Focus block", count: 2, hours: 3 },
+    ],
+    tasksByDay: [
+      { day: "Mon", tasks: 3 },
+      { day: "Tue", tasks: 4 },
+      { day: "Wed", tasks: 5 },
+      { day: "Thu", tasks: 2 },
+      { day: "Fri", tasks: 2 },
+    ],
+    avgTasksPerWorkday: 3.2,
+    attention: [
+      {
+        kind: "overlap",
+        title: "Design sync overlaps standup",
+        detail: "Tue 14:00–15:30 and Team standup 14:15–15:00.",
+      },
+      {
+        kind: "overlap",
+        title: "API review overlaps 1:1",
+        detail: "Thu 10:00–11:00 and 10:30–11:15.",
+      },
+      {
+        kind: "overload",
+        title: "Wednesday is overloaded",
+        detail: "9.1h booked against an 8h workday.",
+      },
+      {
+        kind: "overload",
+        title: "Tuesday is slightly over",
+        detail: "8.2h booked against an 8h workday.",
+      },
+    ],
+    deadlines: [
+      {
+        task: "Write Q1 wrap-up notes",
+        due: "2 days ago",
+        priority: "High",
+        overdue: true,
+      },
+      {
+        task: "Share hiring scorecard",
+        due: "Yesterday",
+        priority: "Medium",
+        overdue: true,
+      },
+      {
+        task: "Confirm vendor invoice",
+        due: "3 days ago",
+        priority: "Low",
+        overdue: true,
+      },
+      {
+        task: "Sprint kickoff & goals",
+        due: "Fri 5:00 PM",
+        priority: "High",
+        overdue: false,
+      },
+      {
+        task: "API contract review",
+        due: "Wed 4:00 PM",
+        priority: "High",
+        overdue: false,
+      },
+    ],
+    unscheduledHigh: [
+      { task: "Security review for auth", due: "Thu" },
+      { task: "Customer interview notes", due: "Fri" },
+      { task: "Offline mode spike", due: "No date" },
+    ],
+  },
+  "Last 7 days": {
+    hoursByDay: [
+      dayLoad("Thu", 5.5, 8),
+      dayLoad("Fri", 7, 8),
+      dayLoad("Sat", 1.5, 0),
+      dayLoad("Sun", 0, 0),
+      dayLoad("Mon", 6, 8),
+      dayLoad("Tue", 8.4, 8),
+      dayLoad("Wed", 3.1, 8),
+    ],
+    peakMinutes: [
+      [15, 40, 25, 10, 45, 30, 15, 0],
+      [45, 60, 50, 20, 55, 50, 30, 15],
+      [20, 25, 15, 5, 20, 10, 5, 0],
+      [10, 45, 20, 10, 35, 25, 10, 0],
+      [25, 40, 50, 20, 45, 20, 10, 0],
+    ],
+    busiest: { day: "Tue", slot: "10:00–11:00" },
+    frequent: [
+      { title: "Team standup", count: 5, hours: 2.5 },
+      { title: "Planning", count: 2, hours: 2 },
+      { title: "1:1", count: 2, hours: 1.5 },
+      { title: "Focus block", count: 2, hours: 2.5 },
+    ],
+    tasksByDay: [
+      { day: "Mon", tasks: 2 },
+      { day: "Tue", tasks: 4 },
+      { day: "Wed", tasks: 1 },
+      { day: "Thu", tasks: 3 },
+      { day: "Fri", tasks: 3 },
+    ],
+    avgTasksPerWorkday: 2.6,
+    attention: [
+      {
+        kind: "overlap",
+        title: "Planning overlaps focus block",
+        detail: "Tue 11:00–12:00 and 11:30–12:30.",
+      },
+      {
+        kind: "overload",
+        title: "Tuesday is overloaded",
+        detail: "8.4h booked against an 8h workday.",
+      },
+    ],
+    deadlines: [
+      {
+        task: "Write Q1 wrap-up notes",
+        due: "2 days ago",
+        priority: "High",
+        overdue: true,
+      },
+      {
+        task: "Share hiring scorecard",
+        due: "Yesterday",
+        priority: "Medium",
+        overdue: true,
+      },
+      {
+        task: "Confirm vendor invoice",
+        due: "3 days ago",
+        priority: "Low",
+        overdue: true,
+      },
+      {
+        task: "API contract review",
+        due: "Tomorrow 4:00 PM",
+        priority: "High",
+        overdue: false,
+      },
+      {
+        task: "Update burndown & velocity",
+        due: "In 2 days",
+        priority: "Medium",
+        overdue: false,
+      },
+    ],
+    unscheduledHigh: [
+      { task: "Security review for auth", due: "Thu" },
+      { task: "Customer interview notes", due: "Fri" },
+    ],
+  },
+  "This month": {
+    hoursByDay: [
+      dayLoad("Week 1", 34, 40),
+      dayLoad("Week 2", 41, 40),
+      dayLoad("Week 3", 29, 40),
+      dayLoad("Week 4", 24, 40),
+    ],
+    peakMinutes: [
+      [25, 40, 35, 20, 45, 35, 15, 5],
+      [40, 55, 50, 30, 50, 45, 25, 10],
+      [50, 60, 55, 40, 55, 50, 35, 15],
+      [20, 40, 30, 15, 40, 30, 20, 5],
+      [15, 30, 35, 20, 40, 25, 15, 5],
+    ],
+    busiest: { day: "Wed", slot: "10:00–11:00" },
+    frequent: [
+      { title: "Team standup", count: 18, hours: 9 },
+      { title: "1:1", count: 8, hours: 6 },
+      { title: "Design sync", count: 6, hours: 9 },
+      { title: "Sprint planning", count: 4, hours: 6 },
+      { title: "Focus block", count: 4, hours: 8 },
+    ],
+    tasksByDay: [
+      { day: "Mon", tasks: 2.8 },
+      { day: "Tue", tasks: 3.6 },
+      { day: "Wed", tasks: 4.1 },
+      { day: "Thu", tasks: 2.4 },
+      { day: "Fri", tasks: 2.1 },
+    ],
+    avgTasksPerWorkday: 3,
+    attention: [
+      {
+        kind: "overlap",
+        title: "Design sync overlaps standup",
+        detail: "Tue 14:00–15:30 and Team standup 14:15–15:00.",
+      },
+      {
+        kind: "overlap",
+        title: "API review overlaps 1:1",
+        detail: "Thu 10:00–11:00 and 10:30–11:15.",
+      },
+      {
+        kind: "overlap",
+        title: "Retro prep overlaps wrap-up",
+        detail: "Fri 15:00–16:00 and 15:30–16:30.",
+      },
+      {
+        kind: "overload",
+        title: "Week 2 is overloaded",
+        detail: "41h booked against 40h workday capacity.",
+      },
+    ],
+    deadlines: [
+      {
+        task: "Write Q1 wrap-up notes",
+        due: "2 days ago",
+        priority: "High",
+        overdue: true,
+      },
+      {
+        task: "Share hiring scorecard",
+        due: "Yesterday",
+        priority: "Medium",
+        overdue: true,
+      },
+      {
+        task: "Confirm vendor invoice",
+        due: "3 days ago",
+        priority: "Low",
+        overdue: true,
+      },
+      {
+        task: "Sprint kickoff & goals",
+        due: "Fri 5:00 PM",
+        priority: "High",
+        overdue: false,
+      },
+      {
+        task: "Retro prep — gather themes",
+        due: "Next week",
+        priority: "Medium",
+        overdue: false,
+      },
+    ],
+    unscheduledHigh: [
+      { task: "Security review for auth", due: "Thu" },
+      { task: "Customer interview notes", due: "Fri" },
+      { task: "Offline mode spike", due: "No date" },
+      { task: "Incident playbook draft", due: "No date" },
+    ],
+  },
+};
+
+function formatHours(hours: number): string {
+  const rounded = Math.round(hours * 10) / 10;
+  return `${rounded}h`;
+}
+
+function hourLabel(hour: number): string {
+  return `${String(hour).padStart(2, "0")}:00`;
+}
+
+function heatColor(minutes: number): string {
+  if (minutes <= 0) return "rgb(244 244 245)";
+  const t = Math.min(1, minutes / 60);
+  const lightness = 92 - t * 48;
+  return `oklch(${lightness / 100} 0.09 180)`;
+}
 
 function SectionCard({
   title,
@@ -115,40 +409,39 @@ function SectionCard({
   );
 }
 
-function StatCard({ label, value, change, positive }: StatCardData) {
+function EmptyState({ icon: Icon, message }: { icon: typeof CalendarOff; message: string }) {
   return (
-    <article className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950/60">
-      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-        {label}
-      </p>
-      <p className="mt-3 text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-        {value}
-      </p>
-      {change ? (
-        <p
-          className={cn(
-            "mt-2 text-xs",
-            positive ? "text-emerald-700 dark:text-emerald-400" : "text-zinc-500 dark:text-zinc-400",
-          )}
-        >
-          {change}
-        </p>
-      ) : null}
-    </article>
+    <p className="flex items-center gap-2 rounded-xl border border-dashed border-zinc-200 px-3 py-6 text-sm text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+      <Icon className="size-4 shrink-0" aria-hidden />
+      {message}
+    </p>
+  );
+}
+
+function priorityClass(priority: DeadlineItem["priority"]) {
+  return cn(
+    "rounded-full px-2 py-0.5 text-[11px] font-medium",
+    priority === "High" && "bg-rose-100 text-rose-700 dark:bg-rose-900/35 dark:text-rose-300",
+    priority === "Medium" &&
+      "bg-amber-100 text-amber-700 dark:bg-amber-900/35 dark:text-amber-300",
+    priority === "Low" && "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200",
   );
 }
 
 export default function AnalyticsPage() {
-  const [range, setRange] = useState("Last 14 days");
-  const [scope, setScope] = useState("Personal");
+  const [range, setRange] = useState<AnalyticsRange>("This week");
+  const snapshot = SNAPSHOTS[range];
+  const deadlines = snapshot.deadlines.slice(0, DEADLINE_LIMIT);
+  const frequent = snapshot.frequent.slice(0, FREQUENT_LIMIT);
+  const unscheduledHigh = snapshot.unscheduledHigh.slice(0, UNSCHEDULED_LIMIT);
+  const boardTotal = BOARD.todo + BOARD.inProgress + BOARD.done;
+  const chartEmpty = snapshot.hoursByDay.every((day) => day.booked === 0);
 
-  const productiveDay = useMemo(
-    () =>
-      workloadByDay.reduce((best, current) =>
-        current.hours > best.hours ? current : best,
-      ).day,
-    [],
-  );
+  const boardRows = [
+    { label: "To do", count: BOARD.todo, color: "#94a3b8" },
+    { label: "In progress", count: BOARD.inProgress, color: "#0f766e" },
+    { label: "Done", count: BOARD.done, color: "#334155" },
+  ];
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-1">
@@ -158,227 +451,272 @@ export default function AnalyticsPage() {
             Analytics
           </h1>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Scheduling performance, workload balance, and productivity insights.
+            Schedule health: overload and slipping work.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center rounded-lg border border-zinc-200 bg-zinc-50 p-1 dark:border-zinc-800 dark:bg-zinc-900/70">
-            {["Last 7 days", "Last 14 days", "This month"].map((item) => (
-              <Button
-                key={item}
-                size="sm"
-                variant={range === item ? "secondary" : "ghost"}
-                onClick={() => setRange(item)}
-                className="h-7 rounded-md text-xs"
-              >
-                <CalendarRange className="size-3.5" aria-hidden />
-                {item}
-              </Button>
-            ))}
-          </div>
-
-          <div className="rounded-lg border border-zinc-200 bg-white px-2 dark:border-zinc-800 dark:bg-zinc-900/70">
-            <select
-              aria-label="Filter scope"
-              value={scope}
-              onChange={(e) => setScope(e.target.value)}
-              className="h-8 bg-transparent text-sm text-zinc-700 outline-none dark:text-zinc-200"
+        <div className="inline-flex flex-wrap items-center rounded-lg border border-zinc-200 bg-zinc-50 p-1 dark:border-zinc-800 dark:bg-zinc-900/70">
+          {RANGES.map((item) => (
+            <Button
+              key={item}
+              size="sm"
+              variant={range === item ? "secondary" : "ghost"}
+              onClick={() => setRange(item)}
+              className="h-7 rounded-md text-xs"
             >
-              <option>Personal</option>
-              <option>Team</option>
-            </select>
-          </div>
+              <CalendarRange className="size-3.5" aria-hidden />
+              {item}
+            </Button>
+          ))}
         </div>
       </header>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map((stat) => (
-          <StatCard key={stat.label} {...stat} />
-        ))}
-      </section>
-
       <section className="grid gap-4 xl:grid-cols-12">
-        <div className="space-y-4 xl:col-span-8">
-          <SectionCard
-            title="Workload Overview"
-            subtitle={`Workload by day of week · ${scope} · ${range}`}
-          >
+        <SectionCard
+          title="Loaded vs free"
+          subtitle={`Booked and free time against a 09:00–17:00 workday · ${range}`}
+          className="xl:col-span-8"
+        >
+          {chartEmpty ? (
+            <EmptyState icon={CalendarOff} message="Nothing scheduled this week" />
+          ) : (
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={workloadByDay}>
+                <BarChart data={snapshot.hoursByDay}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" />
                   <XAxis dataKey="day" tickLine={false} axisLine={false} />
                   <YAxis tickLine={false} axisLine={false} width={30} />
                   <Tooltip
                     cursor={{ fill: "rgba(15, 23, 42, 0.05)" }}
                     contentStyle={{ borderRadius: 12, borderColor: "#e4e4e7", fontSize: 12 }}
+                    formatter={(value, name) => [
+                      formatHours(Number(value ?? 0)),
+                      name === "free" ? "Free" : "Booked",
+                    ]}
                   />
-                  <Bar dataKey="hours" radius={[6, 6, 0, 0]} fill="#0f766e" maxBarSize={34} />
+                  <Bar dataKey="booked" stackId="load" maxBarSize={34}>
+                    {snapshot.hoursByDay.map((entry) => (
+                      <Cell
+                        key={entry.day}
+                        fill={
+                          entry.booked > entry.capacity && entry.capacity > 0 ? "#d97706" : "#0f766e"
+                        }
+                      />
+                    ))}
+                  </Bar>
+                  <Bar
+                    dataKey="free"
+                    stackId="load"
+                    fill="#e4e4e7"
+                    radius={[6, 6, 0, 0]}
+                    maxBarSize={34}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </SectionCard>
+          )}
+        </SectionCard>
 
-          <SectionCard title="Task Completion Trend" subtitle="Completed tasks over time">
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={completionTrend}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" />
-                  <XAxis dataKey="label" tickLine={false} axisLine={false} minTickGap={20} />
-                  <YAxis tickLine={false} axisLine={false} width={24} />
-                  <Tooltip
-                    contentStyle={{ borderRadius: 12, borderColor: "#e4e4e7", fontSize: 12 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="completed"
-                    stroke="#334155"
-                    strokeWidth={2.5}
-                    dot={{ r: 3, strokeWidth: 1, fill: "#fff" }}
-                    activeDot={{ r: 5 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+        <aside className="xl:col-span-4">
+          <SectionCard title="Needs attention" subtitle="Overlaps and overloaded days">
+            {snapshot.attention.length === 0 ? (
+              <EmptyState icon={CalendarOff} message="No overlaps" />
+            ) : (
+              <div className="space-y-3">
+                {snapshot.attention.map((item) => (
+                  <article
+                    key={item.title}
+                    className="rounded-xl border border-amber-200/80 bg-amber-50/70 p-3 dark:border-amber-900/50 dark:bg-amber-950/20"
+                  >
+                    <p className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-800 dark:text-amber-300">
+                      <AlertTriangle className="size-3.5" aria-hidden />
+                      {item.title}
+                    </p>
+                    <p className="mt-1 text-xs text-amber-700/90 dark:text-amber-200/80">{item.detail}</p>
+                  </article>
+                ))}
+              </div>
+            )}
           </SectionCard>
-        </div>
+        </aside>
+      </section>
 
-        <aside className="space-y-4 xl:col-span-4">
-          <SectionCard title="Upcoming Deadlines" subtitle="Priority-focused task reminders">
-            <ul className="space-y-3">
-              {upcomingDeadlines.map((item) => (
-                <li
-                  key={item.task}
-                  className="rounded-xl border border-zinc-200/80 p-3 transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:hover:border-zinc-700"
+      <section className="grid gap-4 xl:grid-cols-12">
+        <SectionCard
+          title="Peak hours"
+          subtitle="How full each weekday hour is · 09:00–17:00"
+          className="xl:col-span-8"
+        >
+          <div className="overflow-x-auto">
+            <div
+              className="grid min-w-md gap-1"
+              style={{ gridTemplateColumns: `2.5rem repeat(${WORK_HOURS.length}, minmax(0, 1fr))` }}
+            >
+              <div />
+              {WORK_HOURS.map((hour) => (
+                <div
+                  key={hour}
+                  className="text-center text-[10px] font-medium text-zinc-500 dark:text-zinc-400"
                 >
-                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{item.task}</p>
-                  <div className="mt-2 flex items-center justify-between gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-                    <span className="inline-flex items-center gap-1">
-                      <CalendarClock className="size-3.5" aria-hidden />
-                      {item.due}
-                    </span>
-                    <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-[11px] font-medium",
-                        item.priority === "High" &&
-                          "bg-rose-100 text-rose-700 dark:bg-rose-900/35 dark:text-rose-300",
-                        item.priority === "Medium" &&
-                          "bg-amber-100 text-amber-700 dark:bg-amber-900/35 dark:text-amber-300",
-                        item.priority === "Low" &&
-                          "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200",
-                      )}
-                    >
-                      {item.priority}
+                  {hour}
+                </div>
+              ))}
+              {WEEKDAYS.map((day, dayIndex) => (
+                <div key={day} className="contents">
+                  <div className="flex items-center text-xs font-medium text-zinc-600 dark:text-zinc-300">
+                    {day}
+                  </div>
+                  {WORK_HOURS.map((hour, hourIndex) => {
+                    const minutes = snapshot.peakMinutes[dayIndex]?.[hourIndex] ?? 0;
+                    return (
+                      <div
+                        key={`${day}-${hour}`}
+                        title={`${day} ${hourLabel(hour)}–${hourLabel(hour + 1)} · ${minutes}m booked`}
+                        className={cn(
+                          "h-8 rounded-sm border border-zinc-200/60 dark:border-zinc-800",
+                          minutes <= 0 && "bg-zinc-100 dark:bg-zinc-800",
+                        )}
+                        style={minutes > 0 ? { backgroundColor: heatColor(minutes) } : undefined}
+                      />
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
+            Busiest: {snapshot.busiest.day} · {snapshot.busiest.slot}
+          </p>
+        </SectionCard>
+
+        <SectionCard title="Most frequent events" subtitle="Repeating titles in this range" className="xl:col-span-4">
+          {frequent.length === 0 ? (
+            <EmptyState icon={Repeat} message="No repeating events" />
+          ) : (
+            <ul className="space-y-3">
+              {frequent.map((item) => (
+                <li
+                  key={item.title}
+                  className="rounded-xl border border-zinc-200/80 p-3 dark:border-zinc-800"
+                >
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{item.title}</p>
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                      {item.count}× · {formatHours(item.hours)}
                     </span>
                   </div>
                 </li>
               ))}
             </ul>
-          </SectionCard>
-
-          <SectionCard title="Scheduling Conflicts" subtitle="Potential issues requiring attention">
-            <div className="space-y-3">
-              {conflicts.map((item) => (
-                <article
-                  key={item.title}
-                  className="rounded-xl border border-amber-200/80 bg-amber-50/70 p-3 dark:border-amber-900/50 dark:bg-amber-950/20"
-                >
-                  <p className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-800 dark:text-amber-300">
-                    <AlertTriangle className="size-3.5" aria-hidden />
-                    {item.title}
-                  </p>
-                  <p className="mt-1 text-xs text-amber-700/90 dark:text-amber-200/80">{item.detail}</p>
-                </article>
-              ))}
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Quick Insights">
-            <ul className="space-y-2">
-              {quickInsights.map((insight) => (
-                <li
-                  key={insight}
-                  className="rounded-xl border border-zinc-200/80 bg-zinc-50 px-3 py-2 text-xs text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-300"
-                >
-                  <p className="inline-flex items-start gap-2">
-                    <TrendingUp className="mt-0.5 size-3.5 text-zinc-500 dark:text-zinc-400" aria-hidden />
-                    <span>{insight}</span>
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </SectionCard>
-        </aside>
+          )}
+        </SectionCard>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-12">
-        <SectionCard title="Time Allocation" subtitle="Where your week is being spent" className="lg:col-span-7">
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={timeAllocation}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={66}
-                  outerRadius={92}
-                  paddingAngle={3}
-                >
-                  {timeAllocation.map((entry) => (
-                    <Cell key={entry.name} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(value) => [`${Number(value ?? 0)}%`, "Allocation"]}
-                  contentStyle={{ borderRadius: 12, borderColor: "#e4e4e7", fontSize: 12 }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {timeAllocation.map((entry) => (
-              <div key={entry.name} className="rounded-lg border border-zinc-200/80 p-2 dark:border-zinc-800">
-                <div className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
-                  <span className="size-2 rounded-full" style={{ backgroundColor: entry.color }} />
-                  {entry.name}
+        <SectionCard title="Board snapshot" subtitle="Open work vs done" className="lg:col-span-4">
+          {boardTotal === 0 ? (
+            <EmptyState icon={ClipboardList} message="No tasks yet" />
+          ) : (
+            <div className="space-y-3">
+              {boardRows.map((row) => (
+                <div key={row.label} className="rounded-xl border border-zinc-200/80 p-3 dark:border-zinc-800">
+                  <div className="flex items-center justify-between gap-2 text-sm">
+                    <p className="text-zinc-600 dark:text-zinc-300">{row.label}</p>
+                    <p className="font-semibold text-zinc-900 dark:text-zinc-100">{row.count}</p>
+                  </div>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${Math.round((row.count / boardTotal) * 100)}%`,
+                        backgroundColor: row.color,
+                      }}
+                    />
+                  </div>
                 </div>
-                <p className="mt-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                  {entry.value}%
-                </p>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </SectionCard>
 
-        <SectionCard title="Productivity Summary" subtitle="Key scheduling outcomes" className="lg:col-span-5">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between rounded-xl border border-zinc-200/80 p-3 dark:border-zinc-800">
-              <p className="inline-flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
-                <CheckCircle2 className="size-4 text-zinc-500" aria-hidden />
-                Most productive day
-              </p>
-              <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{productiveDay}</p>
-            </div>
+        <SectionCard title="Deadlines" subtitle="Overdue first, then the next 7 days" className="lg:col-span-4">
+          {deadlines.length === 0 ? (
+            <EmptyState icon={CalendarClock} message="No overdue tasks" />
+          ) : (
+            <ul className="space-y-3">
+              {deadlines.map((item) => (
+                <li
+                  key={item.task}
+                  className="rounded-xl border border-zinc-200/80 p-3 transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:hover:border-zinc-700"
+                >
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{item.task}</p>
+                    <span className={priorityClass(item.priority)}>{item.priority}</span>
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400",
+                        item.overdue && "font-medium text-rose-700 dark:text-rose-300",
+                      )}
+                    >
+                      <CalendarClock className="size-3.5" aria-hidden />
+                      {item.overdue ? `Overdue · ${item.due}` : item.due}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </SectionCard>
 
-            <div className="flex items-center justify-between rounded-xl border border-zinc-200/80 p-3 dark:border-zinc-800">
-              <p className="inline-flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
-                <Clock3 className="size-4 text-zinc-500" aria-hidden />
-                Average free time
-              </p>
-              <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">2h 15m / day</p>
-            </div>
-
-            <div className="flex items-center justify-between rounded-xl border border-zinc-200/80 p-3 dark:border-zinc-800">
-              <p className="inline-flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
-                <CalendarClock className="size-4 text-zinc-500" aria-hidden />
-                Longest focus session
-              </p>
-              <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">3h 20m (Thu)</p>
-            </div>
-          </div>
+        <SectionCard
+          title="Unscheduled high-priority"
+          subtitle="Open high-priority tasks with no calendar block"
+          className="lg:col-span-4"
+        >
+          {unscheduledHigh.length === 0 ? (
+            <EmptyState icon={ClipboardList} message="No unscheduled high-priority tasks" />
+          ) : (
+            <ul className="space-y-3">
+              {unscheduledHigh.map((item) => (
+                <li
+                  key={item.task}
+                  className="rounded-xl border border-zinc-200/80 p-3 dark:border-zinc-800"
+                >
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{item.task}</p>
+                    <span className={priorityClass("High")}>High</span>
+                    <span className="inline-flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      <CalendarClock className="size-3.5" aria-hidden />
+                      {item.due}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </SectionCard>
       </section>
+
+      <SectionCard
+        title="Average tasks per day"
+        subtitle={`Task-linked blocks only · avg ${snapshot.avgTasksPerWorkday} / workday · ${range}`}
+      >
+        <div className="h-56">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={snapshot.tasksByDay}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" />
+              <XAxis dataKey="day" tickLine={false} axisLine={false} />
+              <YAxis tickLine={false} axisLine={false} width={28} allowDecimals={false} />
+              <Tooltip
+                cursor={{ fill: "rgba(15, 23, 42, 0.05)" }}
+                contentStyle={{ borderRadius: 12, borderColor: "#e4e4e7", fontSize: 12 }}
+                formatter={(value) => [`${Number(value ?? 0)}`, "Task blocks"]}
+              />
+              <Bar dataKey="tasks" fill="#0f766e" radius={[6, 6, 0, 0]} maxBarSize={48} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </SectionCard>
     </div>
   );
 }

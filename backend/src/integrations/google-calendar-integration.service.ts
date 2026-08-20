@@ -1,6 +1,12 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { TaskSource } from '../generated/prisma/client';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
+import { EventSource } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  DEFAULT_FRONTEND_REDIRECT,
+  validateCalendarRedirectUri,
+} from './google-calendar-redirect';
 import {
   DEFAULT_SYNC_DAYS_BACK,
   DEFAULT_SYNC_DAYS_FORWARD,
@@ -23,7 +29,32 @@ export class GoogleCalendarIntegrationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly googleOAuth: GoogleOAuthService,
+    private readonly jwtService: JwtService,
+    private readonly config: ConfigService,
   ) {}
+
+  startConnect(
+    userId: string,
+    redirectUri?: string,
+  ): { connectUrl: string } {
+    const safeRedirect = validateCalendarRedirectUri(
+      redirectUri?.trim() || DEFAULT_FRONTEND_REDIRECT,
+    );
+    const exchange = this.jwtService.sign(
+      { sub: userId, purpose: 'calendar_connect', redirectUri: safeRedirect },
+      { expiresIn: '2m' },
+    );
+    const port = this.config.get<string>('PORT') ?? '3001';
+    const apiBase =
+      this.config.get<string>('API_PUBLIC_URL')?.trim() ||
+      `http://localhost:${port}`;
+    const connectUrl = new URL(
+      `${apiBase.replace(/\/$/, '')}/integrations/google-calendar/connect`,
+    );
+    connectUrl.searchParams.set('exchange', exchange);
+    connectUrl.searchParams.set('redirect_uri', safeRedirect);
+    return { connectUrl: connectUrl.toString() };
+  }
 
   async getStatus(userId: string): Promise<GoogleCalendarConnectionStatus> {
     const row = await this.prisma.googleCalendarIntegration.findUnique({
@@ -166,8 +197,8 @@ export class GoogleCalendarIntegrationService {
 
     await this.prisma.googleCalendarIntegration.delete({ where: { userId } });
 
-    await this.prisma.task.deleteMany({
-      where: { userId, source: TaskSource.google },
+    await this.prisma.event.deleteMany({
+      where: { userId, source: EventSource.google },
     });
   }
 }

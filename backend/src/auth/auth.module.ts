@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuthResolver } from './auth.resolver';
 import { AuthService } from './auth.service';
+import { GqlAuthGuard } from './gql-auth.guard';
 import { GoogleAuthController } from './google-auth.controller';
 
 @Module({
@@ -20,7 +21,7 @@ import { GoogleAuthController } from './google-auth.controller';
     }),
   ],
   controllers: [GoogleAuthController],
-  providers: [AuthService, AuthResolver],
-  exports: [AuthService, JwtModule],
+  providers: [AuthService, AuthResolver, GqlAuthGuard],
+  exports: [AuthService, JwtModule, GqlAuthGuard],
 })
 export class AuthModule {}

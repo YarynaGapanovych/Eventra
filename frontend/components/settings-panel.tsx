@@ -5,18 +5,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  useUpdateUserSettingsMutation,
+  useUserSettingsQuery,
+} from "@/hooks/use-user-settings";
+import {
   durationChoices,
   getAppSettingsPlaceholder,
   listTimezones,
-  loadAppSettings,
   normalizeSettingsPartial,
-  saveAppSettings,
-  SETTINGS_CHANGED_EVENT,
   type AppSettings,
 } from "@/lib/app-settings";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/stores/auth-store";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Suspense, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod/v3";
 
@@ -41,6 +44,7 @@ const settingsFormSchema = z
       .int("Duration must be a whole number of minutes.")
       .min(5, "At least 5 minutes.")
       .max(24 * 60, "At most 24 hours."),
+    showPastDoneTaskEvents: z.boolean(),
   })
   .superRefine((data, ctx) => {
     const startM = minutesFromHm(data.workdayStart);
@@ -57,16 +61,16 @@ const settingsFormSchema = z
 
 type SettingsFormValues = z.infer<typeof settingsFormSchema>;
 
-function emitSettingsSaved(settings: AppSettings) {
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(
-    new CustomEvent<AppSettings>(SETTINGS_CHANGED_EVENT, { detail: settings }),
-  );
-}
-
 export function SettingsPanel() {
+  const token = useAuthStore((s) => s.token);
+  const hydrated = useAuthStore((s) => s.hydrated);
+  const signedIn = Boolean(token);
+  const settingsQuery = useUserSettingsQuery();
+  const updateMutation = useUpdateUserSettingsMutation();
+
   const [zones, setZones] = useState<string[]>([]);
   const [savedPulse, setSavedPulse] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const form = useForm<SettingsFormValues>({
     resolver: zodResolver(settingsFormSchema),
@@ -86,12 +90,16 @@ export function SettingsPanel() {
     name: "defaultEventDurationMinutes",
   });
 
-  useLayoutEffect(() => {
-    reset(loadAppSettings());
-  }, [reset]);
+  useEffect(() => {
+    if (settingsQuery.data) {
+      reset(settingsQuery.data);
+    }
+  }, [settingsQuery.data, reset]);
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- IANA list is client-only */
     setZones(listTimezones());
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
   const durationOpts = useMemo(() => {
@@ -120,12 +128,29 @@ export function SettingsPanel() {
     return em <= sm;
   })();
 
-  function onSubmit(values: SettingsFormValues) {
+  const loading = !hydrated || (signedIn && settingsQuery.isPending);
+  const fieldsDisabled = !signedIn || loading || updateMutation.isPending;
+  const loadError =
+    settingsQuery.error instanceof Error
+      ? settingsQuery.error.message
+      : settingsQuery.error
+        ? "Could not load settings."
+        : null;
+  const displayError = saveError ?? loadError;
+
+  async function onSubmit(values: SettingsFormValues) {
+    if (!signedIn) return;
     const normalized = normalizeSettingsPartial(values);
-    saveAppSettings(normalized);
-    reset(normalized);
-    emitSettingsSaved(normalized);
-    setSavedPulse(true);
+    setSaveError(null);
+    try {
+      const saved: AppSettings = await updateMutation.mutateAsync(normalized);
+      reset(saved);
+      setSavedPulse(true);
+    } catch (err) {
+      setSaveError(
+        err instanceof Error ? err.message : "Could not save settings.",
+      );
+    }
   }
 
   return (
@@ -143,6 +168,7 @@ export function SettingsPanel() {
                 id="settings-day-start"
                 type="time"
                 step={60}
+                disabled={fieldsDisabled}
                 aria-invalid={!!formState.errors.workdayStart}
                 className="h-11 font-mono text-base tabular-nums [&::-webkit-datetime-edit]:text-start"
                 {...register("workdayStart")}
@@ -159,6 +185,7 @@ export function SettingsPanel() {
                 id="settings-day-end"
                 type="time"
                 step={60}
+                disabled={fieldsDisabled}
                 aria-invalid={!!formState.errors.workdayEnd}
                 className="h-11 font-mono text-base tabular-nums [&::-webkit-datetime-edit]:text-start"
                 {...register("workdayEnd")}
@@ -183,6 +210,7 @@ export function SettingsPanel() {
               id="settings-tz"
               list="iana-timezones"
               autoComplete="off"
+              disabled={fieldsDisabled}
               className="font-mono text-sm"
               placeholder="e.g. Europe/Warsaw"
               aria-invalid={!!formState.errors.timezone}
@@ -214,10 +242,12 @@ export function SettingsPanel() {
             <Label htmlFor="settings-duration">Length</Label>
             <select
               id="settings-duration"
+              disabled={fieldsDisabled}
               aria-invalid={!!formState.errors.defaultEventDurationMinutes}
               className={cn(
                 "flex h-10 w-full max-w-xs rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm shadow-none outline-none",
                 "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+                "disabled:cursor-not-allowed disabled:opacity-50",
                 "dark:border-zinc-700 dark:bg-zinc-950",
                 formState.errors.defaultEventDurationMinutes &&
                   "border-destructive ring-3 ring-destructive/20 dark:border-destructive/50 dark:ring-destructive/40",
@@ -241,6 +271,27 @@ export function SettingsPanel() {
           </div>
         </section>
 
+        <section className="rounded-xl border border-zinc-200/80 bg-white/80 p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950/60">
+          <h2 className="text-md font-semibold text-zinc-900 dark:text-zinc-50">
+            Completed tasks on the calendar
+          </h2>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            Future blocks of a done task are always removed so the slot is free.
+            Choose whether past blocks stay visible.
+          </p>
+          <label className="mt-4 flex items-start gap-3 text-sm text-zinc-800 dark:text-zinc-200">
+            <input
+              type="checkbox"
+              className="mt-0.5 size-4 rounded border-zinc-300 text-teal-600 focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={fieldsDisabled}
+              {...register("showPastDoneTaskEvents")}
+            />
+            <span>
+              Show past calendar blocks for completed tasks
+            </span>
+          </label>
+        </section>
+
         <Suspense
           fallback={
             <section className="rounded-xl border border-zinc-200/80 bg-white/80 p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950/60">
@@ -257,15 +308,43 @@ export function SettingsPanel() {
         </Suspense>
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button type="submit" disabled={invalidRange}>
-            Save settings
+          <Button
+            type="submit"
+            disabled={
+              invalidRange ||
+              !signedIn ||
+              loading ||
+              updateMutation.isPending
+            }
+          >
+            {updateMutation.isPending ? "Saving…" : "Save settings"}
           </Button>
           {savedPulse ? (
             <span className="text-sm text-teal-700 dark:text-teal-400">
               Saved.
             </span>
           ) : null}
+          {loading ? (
+            <span className="text-sm text-zinc-500 dark:text-zinc-400">
+              Loading settings…
+            </span>
+          ) : null}
         </div>
+
+        {!signedIn && hydrated ? (
+          <p className="text-sm text-amber-700 dark:text-amber-400">
+            Sign in to Eventra to save settings to your account.{" "}
+            <Link href="/" className="font-medium underline underline-offset-2">
+              Go to sign in
+            </Link>
+          </p>
+        ) : null}
+
+        {displayError ? (
+          <p className="text-sm text-red-600 dark:text-red-400">
+            {displayError}
+          </p>
+        ) : null}
       </form>
     </div>
   );

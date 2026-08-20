@@ -7,15 +7,14 @@ export type AppSettings = {
   /** IANA time zone ID */
   timezone: string;
   defaultEventDurationMinutes: number;
+  showPastDoneTaskEvents: boolean;
 };
-
-/** Dispatched on `window` after settings are saved (`detail`: `AppSettings`). */
-export const SETTINGS_CHANGED_EVENT = "eventra-settings-changed";
 
 export const DEFAULT_APP_SETTINGS: Omit<AppSettings, "timezone"> = {
   workdayStart: "09:00",
   workdayEnd: "17:00",
   defaultEventDurationMinutes: 60,
+  showPastDoneTaskEvents: true,
 };
 
 const DURATION_CHOICES = [15, 30, 45, 60, 90, 120] as const;
@@ -119,6 +118,10 @@ export function normalizeSettingsPartial(raw: unknown): AppSettings {
       o.defaultEventDurationMinutes,
       DEFAULT_APP_SETTINGS.defaultEventDurationMinutes,
     ),
+    showPastDoneTaskEvents:
+      typeof o.showPastDoneTaskEvents === "boolean"
+        ? o.showPastDoneTaskEvents
+        : DEFAULT_APP_SETTINGS.showPastDoneTaskEvents,
   };
 }
 
@@ -130,30 +133,19 @@ export function getAppSettingsPlaceholder(): AppSettings {
   };
 }
 
-export function loadAppSettings(): AppSettings {
-  if (typeof window === "undefined") {
-    return getAppSettingsPlaceholder();
-  }
+export function takeLegacyLocalSettings(): AppSettings | null {
+  if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return {
-        ...DEFAULT_APP_SETTINGS,
-        timezone: getDefaultTimezone(),
-      };
-    }
+    if (!raw) return null;
     const parsed = JSON.parse(raw) as unknown;
     return normalizeSettingsPartial(parsed);
   } catch {
-    return {
-      ...DEFAULT_APP_SETTINGS,
-      timezone: getDefaultTimezone(),
-    };
+    return null;
   }
 }
 
-export function saveAppSettings(settings: AppSettings): void {
+export function clearLegacyLocalSettings(): void {
   if (typeof window === "undefined") return;
-  const normalized = normalizeSettingsPartial(settings);
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+  window.localStorage.removeItem(STORAGE_KEY);
 }

@@ -7,7 +7,9 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { RootResolver } from './root.resolver';
+import { EventsModule } from './events/events.module';
 import { TasksModule } from './tasks/tasks.module';
+import { UserSettingsModule } from './user-settings/user-settings.module';
 
 const isProd = process.env.NODE_ENV === 'production';
 
@@ -21,11 +23,14 @@ const isProd = process.env.NODE_ENV === 'production';
       sortSchema: true,
       graphiql: !isProd,
       introspection: !isProd,
+      context: ({ req }: { req: unknown }) => ({ req }),
     }),
     PrismaModule,
     AuthModule,
     IntegrationsModule,
+    EventsModule,
     TasksModule,
+    UserSettingsModule,
   ],
   providers: [RootResolver],
 })
