@@ -6,6 +6,13 @@ import {
   isMockTaskId,
   MOCK_TASK_ID_PREFIX,
 } from "@/lib/mock-tasks";
+import {
+  EMPTY_CALENDAR_DETAILS,
+  withCalendarDefaults,
+  type CalendarDetails,
+  type CalendarDetailsInput,
+} from "@/lib/calendar-details";
+import { normalizeApiEvent, type ApiEvent } from "@/lib/events-api";
 
 export { isMockTaskId, MOCK_TASK_ID_PREFIX, buildMockTasks };
 
@@ -35,16 +42,7 @@ export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
   high: "High",
 };
 
-export type ApiTaskEvent = {
-  id: string;
-  title: string;
-  start: string;
-  end: string;
-  source: "eventra" | "google";
-  googleEventId: string | null;
-  color: string | null;
-  taskId: string | null;
-};
+export type ApiTaskEvent = ApiEvent;
 
 export type ApiTask = {
   id: string;
@@ -54,27 +52,39 @@ export type ApiTask = {
   priority: TaskPriority;
   deadline: string | null;
   areaId: string | null;
+  start: string | null;
+  end: string | null;
+  color: string | null;
   employees: { id: string; name: string | null }[];
   events: ApiTaskEvent[];
-};
+} & CalendarDetails;
 
 export type CreateTaskInput = {
   name: string;
   status?: TaskBoardStatus;
   priority?: TaskPriority;
   deadline?: string;
-};
+  start?: string;
+  end?: string;
+} & CalendarDetailsInput;
 
 export type UpdateTaskInput = Partial<{
   name: string;
   status: TaskBoardStatus;
   priority: TaskPriority;
   deadline: string | null;
-}>;
+  start: string | null;
+  end: string | null;
+}> & CalendarDetailsInput;
 
 export function normalizeApiTask(task: ApiTask): ApiTask {
   return {
+    ...EMPTY_CALENDAR_DETAILS,
     ...task,
-    events: task.events ?? [],
+    ...withCalendarDefaults(task),
+    start: task.start ?? null,
+    end: task.end ?? null,
+    color: task.color ?? null,
+    events: (task.events ?? []).map((event) => normalizeApiEvent(event)),
   };
 }

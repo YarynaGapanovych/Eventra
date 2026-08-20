@@ -1,27 +1,9 @@
+import { TASK_SELECTION } from "@/lib/graphql/fragments";
+
 export const CREATE_TASK_MUTATION = `
   mutation CreateTask($input: CreateTaskInput!) {
     createTask(input: $input) {
-      id
-      name
-      progressStatus
-      status
-      priority
-      deadline
-      areaId
-      employees {
-        id
-        name
-      }
-      events {
-        id
-        title
-        start
-        end
-        source
-        googleEventId
-        color
-        taskId
-      }
+      ${TASK_SELECTION}
     }
   }
 `;

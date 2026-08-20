@@ -1,14 +1,9 @@
+import { EVENT_SELECTION } from "@/lib/graphql/fragments";
+
 export const EVENTS_QUERY = `
   query Events {
     events {
-      id
-      title
-      start
-      end
-      source
-      googleEventId
-      color
-      taskId
+      ${EVENT_SELECTION}
     }
   }
 `;

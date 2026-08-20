@@ -1,4 +1,5 @@
 import dayjs from "dayjs";
+import { EMPTY_CALENDAR_DETAILS } from "./calendar-details";
 import type { ApiEvent } from "./events-api";
 import type { ApiTask } from "./tasks-api";
 
@@ -38,9 +39,10 @@ export function buildMockTasks(): ApiTask[] {
     googleEventId: null,
     color: null,
     taskId,
+    ...EMPTY_CALENDAR_DETAILS,
   });
 
-  const tasks: ApiTask[] = [
+  const tasks = [
     {
       id: `${MOCK_TASK_ID_PREFIX}kickoff`,
       name: "Sprint kickoff & goals",
@@ -48,6 +50,10 @@ export function buildMockTasks(): ApiTask[] {
       status: "in_progress",
       priority: "high",
       deadline: iso(at(4, 17, 0)),
+      start: iso(at(1, 9, 0)),
+      end: iso(at(1, 11, 30)),
+      color: null,
+      ...EMPTY_CALENDAR_DETAILS,
       areaId: null,
       employees: [{ id: "mock-e1", name: "Jordan Lee" }],
       events: [
@@ -190,7 +196,15 @@ export function buildMockTasks(): ApiTask[] {
     },
   ];
 
-  return tasks;
+  return tasks.map((task) => ({
+    ...EMPTY_CALENDAR_DETAILS,
+    color: null,
+    guests: [],
+    reminders: [],
+    ...task,
+    start: task.events[0]?.start ?? null,
+    end: task.events[0]?.end ?? null,
+  })) as ApiTask[];
 }
 
 export function buildMockEvents(tasks: ApiTask[] = buildMockTasks()): ApiEvent[] {
@@ -205,6 +219,7 @@ export function buildMockEvents(tasks: ApiTask[] = buildMockTasks()): ApiEvent[]
     googleEventId: "mock-google-standup",
     color: "#5484ED",
     taskId: null,
+    ...EMPTY_CALENDAR_DETAILS,
   };
   return [...fromTasks, standup].sort((a, b) => a.start.localeCompare(b.start));
 }

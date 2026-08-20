@@ -75,16 +75,29 @@ export function useUpdateEventMutation() {
       input: UpdateEventInput;
     }) => {
       if (isMockEventId(id)) {
-        return {
+        return normalizeApiEvent({
           id,
           title: input.title ?? "",
           start: input.start ?? "",
           end: input.end ?? "",
-          source: "eventra" as const,
+          source: "eventra",
           googleEventId: null,
           color: input.color ?? null,
           taskId: null,
-        };
+          location: input.location ?? null,
+          description: input.description ?? null,
+          allDay: input.allDay ?? false,
+          timezone: input.timezone ?? null,
+          recurrence: input.recurrence ?? null,
+          busy: input.busy ?? true,
+          visibility: input.visibility ?? "default",
+          conferenceUrl: input.conferenceUrl ?? null,
+          guestCanModify: input.guestCanModify ?? false,
+          guestCanInvite: input.guestCanInvite ?? true,
+          guestCanSeeOthers: input.guestCanSeeOthers ?? true,
+          guests: [],
+          reminders: [],
+        });
       }
       const data = await graphqlRequest<{ updateEvent: ApiEvent }>(
         UPDATE_EVENT_MUTATION,

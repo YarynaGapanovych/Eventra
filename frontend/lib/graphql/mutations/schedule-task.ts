@@ -1,14 +1,9 @@
+import { EVENT_SELECTION } from "@/lib/graphql/fragments";
+
 export const SCHEDULE_TASK_MUTATION = `
   mutation ScheduleTask($input: ScheduleTaskInput!) {
     scheduleTask(input: $input) {
-      id
-      title
-      start
-      end
-      source
-      googleEventId
-      color
-      taskId
+      ${EVENT_SELECTION}
     }
   }
 `;

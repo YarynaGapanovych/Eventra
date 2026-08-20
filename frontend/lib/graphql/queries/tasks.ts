@@ -1,27 +1,9 @@
+import { TASK_SELECTION } from "@/lib/graphql/fragments";
+
 export const TASKS_QUERY = `
   query Tasks {
     tasks {
-      id
-      name
-      progressStatus
-      status
-      priority
-      deadline
-      areaId
-      employees {
-        id
-        name
-      }
-      events {
-        id
-        title
-        start
-        end
-        source
-        googleEventId
-        color
-        taskId
-      }
+      ${TASK_SELECTION}
     }
   }
 `;
