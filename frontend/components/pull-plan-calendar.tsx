@@ -1,13 +1,12 @@
 "use client";
 
 import { CalendarCreateEventModal } from "@/components/calendar-create-event-modal";
-import { EventColorPicker } from "@/components/event-color-picker";
+import { CalendarEventDetailModal } from "@/components/calendar-event-detail-modal";
 import {
   EventCreateColorProvider,
-  useEventCreateColor,
+  useEventCreateDraft,
 } from "@/components/event-create-color-context";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { getStoredAuth } from "@/lib/auth-api";
 import {
   useGoogleCalendarStatusQuery,
@@ -20,18 +19,18 @@ import {
   useUpdateEventMutation,
 } from "@/hooks/use-events";
 import { useTasksQuery } from "@/hooks/use-tasks";
+import { parseMasterEventId } from "@/lib/calendar-details";
 import { type ApiEvent } from "@/lib/events-api";
 import {
-  DEFAULT_EVENTRA_EVENT_COLOR,
   eventContrastText,
   GOOGLE_EVENT_COLOR_FALLBACK,
   TASK_BLOCK_COLOR,
   toGoogleDisplayColor,
 } from "@/lib/event-colors";
+import { syncEntityReminders } from "@/lib/reminder-storage";
 import { type ApiTask } from "@/lib/tasks-api";
-import { cn } from "@/lib/utils";
 import dayjs from "dayjs";
-import { CalendarPlus, ChevronLeft, ChevronRight, Eye, X } from "lucide-react";
+import { CalendarPlus, ChevronLeft, ChevronRight, Eye } from "lucide-react";
 import {
   Calendar,
   mapEventToTask,
@@ -42,7 +41,6 @@ import {
   type CalendarEventResizePayload,
   type CalendarViewMode,
   type Task,
-  type TaskModalProps,
 } from "pull-plan-calendar";
 import "pull-plan-calendar/dist/calendar.css";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -111,146 +109,6 @@ function CalendarEventActionButton({
       <Eye className="size-3.5" aria-hidden />
       View
     </Button>
-  );
-}
-
-function CalendarEventDetailModal({
-  task,
-  isOpen,
-  onClose,
-  className,
-}: TaskModalProps) {
-  const updateEventMutation = useUpdateEventMutation();
-  const source = typeof task?.source === "string" ? task.source : null;
-  const kind = typeof task?.kind === "string" ? task.kind : null;
-  const eventId = typeof task?.id === "string" ? task.id : null;
-  const storedColor =
-    typeof task?.color === "string"
-      ? toGoogleDisplayColor(task.color)
-      : null;
-  const canEditColor =
-    source !== "google" && kind !== "unscheduled-task" && Boolean(eventId);
-  const initialColor =
-    storedColor ??
-    (kind === "task-block"
-      ? TASK_BLOCK_COLOR
-      : DEFAULT_EVENTRA_EVENT_COLOR);
-  const [color, setColor] = useState(initialColor);
-  const [colorError, setColorError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    setColor(initialColor);
-    setColorError(null);
-  }, [isOpen, initialColor]);
-
-  async function handleColorChange(hex: string) {
-    setColor(hex);
-    if (!canEditColor || !eventId) return;
-    setColorError(null);
-    try {
-      await updateEventMutation.mutateAsync({
-        id: eventId,
-        input: { color: hex },
-      });
-    } catch (err) {
-      setColorError(
-        err instanceof Error ? err.message : "Could not update color.",
-      );
-    }
-  }
-
-  if (!isOpen) return null;
-
-  const googleLabelColor = storedColor ?? GOOGLE_EVENT_COLOR_FALLBACK;
-
-  return (
-    <div
-      className={cn(
-        "fixed inset-0 z-50 flex items-center justify-center p-4",
-        className,
-      )}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="calendar-event-detail-title"
-    >
-      <Button
-        type="button"
-        variant="ghost"
-        aria-label="Close"
-        onClick={onClose}
-        className="absolute inset-0 z-0 h-full min-h-0 w-full cursor-default rounded-none border-0 bg-zinc-950/40 p-0 shadow-none ring-0 backdrop-blur-sm hover:bg-zinc-950/45 focus-visible:ring-0 dark:bg-black/50 dark:hover:bg-black/55"
-      />
-      <div className="relative z-10 w-full max-w-md rounded-xl border border-zinc-200 bg-white p-6 shadow-lg dark:border-zinc-800 dark:bg-zinc-950">
-        <div className="flex items-start justify-between gap-3">
-          <h2
-            id="calendar-event-detail-title"
-            className="text-lg font-semibold text-zinc-900 dark:text-zinc-50"
-          >
-            {kind === "unscheduled-task" ? "Unscheduled task" : "Event details"}
-          </h2>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="shrink-0"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            <X className="size-4" aria-hidden />
-          </Button>
-        </div>
-        <p className="mt-3 font-medium text-zinc-900 dark:text-zinc-50">
-          {task.name}
-        </p>
-        {source === "google" ? (
-          <p
-            className="mt-1 text-xs font-medium"
-            style={{ color: googleLabelColor }}
-          >
-            Google Calendar
-          </p>
-        ) : kind === "task-block" ? (
-          <p className="mt-1 text-xs font-medium text-teal-700 dark:text-teal-400">
-            Scheduled task
-          </p>
-        ) : null}
-        {kind !== "unscheduled-task" ? (
-          <>
-            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-              Start: {dayjs(task.startDate).format("MMM D, YYYY h:mm A")}
-            </p>
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
-              End: {dayjs(task.endDate).format("MMM D, YYYY h:mm A")}
-            </p>
-          </>
-        ) : (
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            Drag onto the calendar to schedule a time block.
-          </p>
-        )}
-        {canEditColor ? (
-          <div className="mt-4 space-y-2">
-            <Label>Color</Label>
-            <EventColorPicker
-              value={color}
-              onChange={(hex) => void handleColorChange(hex)}
-              disabled={updateEventMutation.isPending}
-            />
-            {colorError ? (
-              <p className="text-xs text-red-700 dark:text-red-400" role="alert">
-                {colorError}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-        <div className="mt-6 flex justify-end">
-          <Button type="button" variant="outline" onClick={onClose}>
-            Close
-          </Button>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -391,7 +249,7 @@ function PullPlanCalendarView() {
     };
   }, [events, tasks]);
 
-  const { color: pendingCreateColor } = useEventCreateColor();
+  const { getDraft, setDraft } = useEventCreateDraft();
   const calendarKey = `${events
     .map((e) => `${e.id}:${e.color ?? ""}`)
     .join(",")}|${tasks.map((t) => t.id).join(",")}`;
@@ -418,11 +276,30 @@ function PullPlanCalendarView() {
   async function handleEventCreate(payload: CalendarEventCreatePayload) {
     setActionError(null);
     try {
-      await createEventMutation.mutateAsync({
+      const draft = getDraft();
+      const created = await createEventMutation.mutateAsync({
         title: payload.title.trim() || "Untitled event",
         start: payload.start.toISOString(),
         end: payload.end.toISOString(),
-        color: pendingCreateColor,
+        ...draft,
+        color: draft.color,
+      });
+      syncEntityReminders({
+        entityId: created.id,
+        title: created.title,
+        startIso: created.start,
+        minutesBefore: created.reminders.map((item) => item.minutesBefore),
+      });
+      setDraft({
+        color: created.color ?? undefined,
+        allDay: false,
+        busy: true,
+        visibility: "default",
+        guestCanModify: false,
+        guestCanInvite: true,
+        guestCanSeeOthers: true,
+        guests: [],
+        reminders: [],
       });
     } catch (err) {
       const message =
@@ -435,7 +312,10 @@ function PullPlanCalendarView() {
   async function persistMoveOrResize(
     payload: CalendarEventMovePayload | CalendarEventResizePayload,
   ) {
-    const source = events.find((e) => e.id === payload.id)?.source;
+    const matched =
+      events.find((e) => e.id === payload.id) ??
+      events.find((e) => e.id === parseMasterEventId(payload.id));
+    const source = matched?.source;
     if (source === "google") {
       const message = "Google Calendar events cannot be edited in Eventra.";
       setActionError(message);
