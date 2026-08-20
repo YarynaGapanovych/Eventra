@@ -4,6 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import {
+  loadReminders,
+  reminderUid,
+  saveReminders,
+  type StoredNotification,
+  type StoredReminder,
+  NOTIF_KEY,
+} from "@/lib/reminder-storage";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { Bell, Check, Trash2, X } from "lucide-react";
@@ -18,28 +26,6 @@ import {
 } from "react";
 
 dayjs.extend(relativeTime);
-
-const NOTIF_KEY = "eventra.notifications.v1";
-const REMINDER_KEY = "eventra.reminders.v1";
-
-export type StoredNotification = {
-  id: string;
-  title: string;
-  body?: string;
-  createdAt: string;
-  read: boolean;
-  kind: "system" | "reminder";
-};
-
-export type StoredReminder = {
-  id: string;
-  title: string;
-  remindAt: string;
-};
-
-function uid() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
 
 function readInitialNotifications(): StoredNotification[] {
   if (typeof window === "undefined") return [];
@@ -79,22 +65,6 @@ function seedNotifications(): StoredNotification[] {
 
 function saveNotifs(items: StoredNotification[]) {
   window.localStorage.setItem(NOTIF_KEY, JSON.stringify(items));
-}
-
-function loadReminders(): StoredReminder[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(REMINDER_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as StoredReminder[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveReminders(items: StoredReminder[]) {
-  window.localStorage.setItem(REMINDER_KEY, JSON.stringify(items));
 }
 
 type Tab = "notifications" | "reminders";
@@ -152,7 +122,7 @@ export function NotificationsCenter({ className }: { className?: string }) {
     setReminders(nextR);
 
     const extras: StoredNotification[] = due.map((r) => ({
-      id: uid(),
+      id: reminderUid(),
       title: "Reminder",
       body: r.title,
       createdAt: new Date().toISOString(),
@@ -166,6 +136,13 @@ export function NotificationsCenter({ className }: { className?: string }) {
       return merged;
     });
   }, []);
+
+  useEffect(() => {
+    const tick = () => flushDueRemindersIntoInbox(loadReminders());
+    tick();
+    const timer = window.setInterval(tick, 30_000);
+    return () => window.clearInterval(timer);
+  }, [flushDueRemindersIntoInbox]);
 
   const handleToggle = useCallback(() => {
     if (open) {
@@ -215,7 +192,7 @@ export function NotificationsCenter({ className }: { className?: string }) {
     if (!at.isValid()) return;
     persistReminders([
       ...reminders,
-      { id: uid(), title: t, remindAt: at.toISOString() },
+      { id: reminderUid(), title: t, remindAt: at.toISOString() },
     ]);
     setRemTitle("");
     setRemWhen(dayjs().add(1, "hour").format("YYYY-MM-DDTHH:mm"));
