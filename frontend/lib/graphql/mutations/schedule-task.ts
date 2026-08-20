@@ -7,6 +7,7 @@ export const SCHEDULE_TASK_MUTATION = `
       end
       source
       googleEventId
+      color
       taskId
     }
   }

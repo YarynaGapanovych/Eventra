@@ -42,6 +42,7 @@ export type ApiTaskEvent = {
   end: string;
   source: "eventra" | "google";
   googleEventId: string | null;
+  color: string | null;
   taskId: string | null;
 };
 

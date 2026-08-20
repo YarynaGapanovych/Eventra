@@ -126,6 +126,7 @@ function toEventDto(event: PrismaEvent): Event {
     end: event.end.toISOString(),
     source: event.source,
     googleEventId: event.googleEventId,
+    color: event.color,
     taskId: event.taskId,
   };
 }

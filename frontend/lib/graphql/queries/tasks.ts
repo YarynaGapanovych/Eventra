@@ -19,6 +19,7 @@ export const TASKS_QUERY = `
         end
         source
         googleEventId
+        color
         taskId
       }
     }

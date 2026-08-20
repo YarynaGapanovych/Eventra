@@ -1,16 +1,19 @@
 "use client";
 
+import { EventColorPicker } from "@/components/event-color-picker";
+import { useEventCreateColor } from "@/components/event-create-color-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { DEFAULT_APP_SETTINGS } from "@/lib/app-settings";
+import { DEFAULT_EVENTRA_EVENT_COLOR } from "@/lib/event-colors";
 import { useUserSettingsQuery } from "@/hooks/use-user-settings";
 import dayjs from "dayjs";
 import type { Dayjs } from "dayjs";
 import type { CreateTaskModalProps } from "pull-plan-calendar";
 import { X } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 function defaultEnd(start: Dayjs, durationMinutes: number): Dayjs {
   const m = durationMinutes <= 0 ? 60 : durationMinutes;
@@ -28,6 +31,7 @@ export function CalendarCreateEventModal({
   const durationMinutes =
     settingsQuery.data?.defaultEventDurationMinutes ??
     DEFAULT_APP_SETTINGS.defaultEventDurationMinutes;
+  const { color, setColor } = useEventCreateColor();
   const [title, setTitle] = useState("");
   const [startDate, setStartDate] = useState(() => dayjs().minute(0).second(0));
   const [endDate, setEndDate] = useState(() =>
@@ -41,6 +45,11 @@ export function CalendarCreateEventModal({
     setStartDate(s);
     setEndDate(defaultEnd(s, durationMinutes));
   };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setColor(DEFAULT_EVENTRA_EVENT_COLOR);
+  }, [isOpen, setColor]);
 
   const handleCancel = () => {
     reset();
@@ -137,6 +146,10 @@ export function CalendarCreateEventModal({
               onChange={(e) => setEndDate(dayjs(e.target.value))}
               required
             />
+          </div>
+          <div className="space-y-2">
+            <Label>Color</Label>
+            <EventColorPicker value={color} onChange={setColor} />
           </div>
           {areaId ? (
             <p className="text-xs text-zinc-500 dark:text-zinc-400">

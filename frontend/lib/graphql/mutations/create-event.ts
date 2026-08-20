@@ -7,6 +7,7 @@ export const CREATE_EVENT_MUTATION = `
       end
       source
       googleEventId
+      color
       taskId
     }
   }

@@ -36,6 +36,7 @@ export function buildMockTasks(): ApiTask[] {
     end: iso(end),
     source: "eventra",
     googleEventId: null,
+    color: null,
     taskId,
   });
 
@@ -202,6 +203,7 @@ export function buildMockEvents(tasks: ApiTask[] = buildMockTasks()): ApiEvent[]
     end: day0.add(1, "day").hour(10).minute(30).toISOString(),
     source: "google",
     googleEventId: "mock-google-standup",
+    color: "#5484ED",
     taskId: null,
   };
   return [...fromTasks, standup].sort((a, b) => a.start.localeCompare(b.start));

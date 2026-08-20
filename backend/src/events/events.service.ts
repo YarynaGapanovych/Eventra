@@ -52,6 +52,7 @@ export class EventsService {
         start,
         end,
         source: EventSource.eventra,
+        color: normalizeHexColor(input.color),
       },
     });
     return this.toDto(created);
@@ -86,6 +87,10 @@ export class EventsService {
         title: input.title?.trim() ?? existing.title,
         start,
         end,
+        color:
+          input.color !== undefined
+            ? normalizeHexColor(input.color)
+            : existing.color,
       },
     });
     return this.toDto(updated);
@@ -143,9 +148,15 @@ export class EventsService {
       end: event.end.toISOString(),
       source: event.source,
       googleEventId: event.googleEventId,
+      color: event.color,
       taskId: event.taskId,
     };
   }
+}
+
+function normalizeHexColor(value?: string): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed.toUpperCase() : null;
 }
 
 function parseIsoDate(value: string, field: string): Date {

@@ -14,6 +14,7 @@ type AuthUser {
 }
 
 input CreateEventInput {
+  color: String
   end: String!
   start: String!
   title: String!
@@ -27,6 +28,7 @@ input CreateTaskInput {
 }
 
 type Event {
+  color: String
   end: String!
   googleEventId: String
   id: String!
@@ -142,6 +144,7 @@ enum TaskPriority {
 }
 
 input UpdateEventInput {
+  color: String
   end: String
   start: String
   title: String

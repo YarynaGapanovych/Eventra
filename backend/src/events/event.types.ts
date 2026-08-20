@@ -1,6 +1,14 @@
 import { Field, InputType, ObjectType, registerEnumType } from '@nestjs/graphql';
-import { IsDateString, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsDateString,
+  IsOptional,
+  IsString,
+  Matches,
+  MinLength,
+} from 'class-validator';
 import { EventSource } from '../generated/prisma/client';
+
+const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
 
 registerEnumType(EventSource, { name: 'EventSource' });
 
@@ -25,6 +33,9 @@ export class Event {
   googleEventId!: string | null;
 
   @Field(() => String, { nullable: true })
+  color!: string | null;
+
+  @Field(() => String, { nullable: true })
   taskId!: string | null;
 }
 
@@ -42,6 +53,11 @@ export class CreateEventInput {
   @Field()
   @IsDateString()
   end!: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @Matches(HEX_COLOR, { message: 'Color must be a 6-digit hex value.' })
+  color?: string;
 }
 
 @InputType()
@@ -61,6 +77,11 @@ export class UpdateEventInput {
   @IsOptional()
   @IsDateString()
   end?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @Matches(HEX_COLOR, { message: 'Color must be a 6-digit hex value.' })
+  color?: string;
 }
 
 @InputType()

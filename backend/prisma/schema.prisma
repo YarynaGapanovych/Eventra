@@ -94,6 +94,7 @@ model Event {
   end           DateTime
   source        EventSource @default(eventra)
   googleEventId String?
+  color         String?
   taskId        String?
   task          Task?       @relation(fields: [taskId], references: [id], onDelete: Cascade)
   createdAt     DateTime    @default(now())

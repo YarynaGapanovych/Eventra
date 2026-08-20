@@ -1,7 +1,13 @@
 "use client";
 
 import { CalendarCreateEventModal } from "@/components/calendar-create-event-modal";
+import { EventColorPicker } from "@/components/event-color-picker";
+import {
+  EventCreateColorProvider,
+  useEventCreateColor,
+} from "@/components/event-create-color-context";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { getStoredAuth } from "@/lib/auth-api";
 import {
   useGoogleCalendarStatusQuery,
@@ -15,6 +21,13 @@ import {
 } from "@/hooks/use-events";
 import { useTasksQuery } from "@/hooks/use-tasks";
 import { type ApiEvent } from "@/lib/events-api";
+import {
+  DEFAULT_EVENTRA_EVENT_COLOR,
+  eventContrastText,
+  GOOGLE_EVENT_COLOR_FALLBACK,
+  TASK_BLOCK_COLOR,
+  toGoogleDisplayColor,
+} from "@/lib/event-colors";
 import { type ApiTask } from "@/lib/tasks-api";
 import { cn } from "@/lib/utils";
 import dayjs from "dayjs";
@@ -35,8 +48,6 @@ import "pull-plan-calendar/dist/calendar.css";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 const calendarNavIconClass = "size-4 shrink-0";
-const GOOGLE_EVENT_COLOR = "#4285F4";
-const TASK_BLOCK_COLOR = "#0f766e";
 const CALENDAR_VIEW_STORAGE_KEY = "eventra.calendar.view.v1";
 const UNSCHEDULED_PREFIX = "task:";
 const CALENDAR_VIEWS: readonly CalendarViewMode[] = [
@@ -109,10 +120,49 @@ function CalendarEventDetailModal({
   onClose,
   className,
 }: TaskModalProps) {
+  const updateEventMutation = useUpdateEventMutation();
+  const source = typeof task?.source === "string" ? task.source : null;
+  const kind = typeof task?.kind === "string" ? task.kind : null;
+  const eventId = typeof task?.id === "string" ? task.id : null;
+  const storedColor =
+    typeof task?.color === "string"
+      ? toGoogleDisplayColor(task.color)
+      : null;
+  const canEditColor =
+    source !== "google" && kind !== "unscheduled-task" && Boolean(eventId);
+  const initialColor =
+    storedColor ??
+    (kind === "task-block"
+      ? TASK_BLOCK_COLOR
+      : DEFAULT_EVENTRA_EVENT_COLOR);
+  const [color, setColor] = useState(initialColor);
+  const [colorError, setColorError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setColor(initialColor);
+    setColorError(null);
+  }, [isOpen, initialColor]);
+
+  async function handleColorChange(hex: string) {
+    setColor(hex);
+    if (!canEditColor || !eventId) return;
+    setColorError(null);
+    try {
+      await updateEventMutation.mutateAsync({
+        id: eventId,
+        input: { color: hex },
+      });
+    } catch (err) {
+      setColorError(
+        err instanceof Error ? err.message : "Could not update color.",
+      );
+    }
+  }
+
   if (!isOpen) return null;
 
-  const source = typeof task.source === "string" ? task.source : null;
-  const kind = typeof task.kind === "string" ? task.kind : null;
+  const googleLabelColor = storedColor ?? GOOGLE_EVENT_COLOR_FALLBACK;
 
   return (
     <div
@@ -154,7 +204,10 @@ function CalendarEventDetailModal({
           {task.name}
         </p>
         {source === "google" ? (
-          <p className="mt-1 text-xs font-medium text-[#4285F4]">
+          <p
+            className="mt-1 text-xs font-medium"
+            style={{ color: googleLabelColor }}
+          >
             Google Calendar
           </p>
         ) : kind === "task-block" ? (
@@ -176,6 +229,21 @@ function CalendarEventDetailModal({
             Drag onto the calendar to schedule a time block.
           </p>
         )}
+        {canEditColor ? (
+          <div className="mt-4 space-y-2">
+            <Label>Color</Label>
+            <EventColorPicker
+              value={color}
+              onChange={(hex) => void handleColorChange(hex)}
+              disabled={updateEventMutation.isPending}
+            />
+            {colorError ? (
+              <p className="text-xs text-red-700 dark:text-red-400" role="alert">
+                {colorError}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
         <div className="mt-6 flex justify-end">
           <Button type="button" variant="outline" onClick={onClose}>
             Close
@@ -186,13 +254,16 @@ function CalendarEventDetailModal({
   );
 }
 
+function scheduledEventColor(event: ApiEvent): string | undefined {
+  const stored = toGoogleDisplayColor(event.color);
+  if (stored) return stored;
+  if (event.source === "google") return GOOGLE_EVENT_COLOR_FALLBACK;
+  if (event.taskId) return TASK_BLOCK_COLOR;
+  return undefined;
+}
+
 function toScheduledCalendarEvent(event: ApiEvent): CalendarEvent {
-  const color =
-    event.source === "google"
-      ? GOOGLE_EVENT_COLOR
-      : event.taskId
-        ? TASK_BLOCK_COLOR
-        : undefined;
+  const color = scheduledEventColor(event);
   return {
     id: event.id,
     title: event.title,
@@ -203,6 +274,7 @@ function toScheduledCalendarEvent(event: ApiEvent): CalendarEvent {
       source: event.source,
       taskId: event.taskId,
       kind: event.taskId ? "task-block" : "event",
+      color,
     },
   };
 }
@@ -224,12 +296,15 @@ function toUnscheduledCalendarEvent(task: ApiTask): CalendarEvent {
 
 function mapCalendarEventToLibraryTask(event: CalendarEvent): Task {
   const mapped = mapEventToTask(event);
+  const metaColor =
+    typeof event.meta?.color === "string" ? event.meta.color : undefined;
   return {
     ...mapped,
     progressStatus: ProgressStatus.NOT_STARTED,
     source: event.meta?.source,
     kind: event.meta?.kind,
     taskId: event.meta?.taskId,
+    color: event.color ?? metaColor,
   };
 }
 
@@ -238,7 +313,28 @@ function unscheduledTaskId(calendarEventId: string): string | null {
   return calendarEventId.slice(UNSCHEDULED_PREFIX.length);
 }
 
+/** Day/month/year views ignore event.color and use CSS --event-color instead. */
+function eventColorCss(events: CalendarEvent[]): string {
+  return events
+    .map((event) => {
+      const color = toGoogleDisplayColor(event.color);
+      if (!color) return "";
+      const text = eventContrastText(color);
+      return `[data-slot="event"][data-event-id="${CSS.escape(event.id)}"]{--event-color:${color};color:${text}}`;
+    })
+    .filter(Boolean)
+    .join("");
+}
+
 export function PullPlanCalendar() {
+  return (
+    <EventCreateColorProvider>
+      <PullPlanCalendarView />
+    </EventCreateColorProvider>
+  );
+}
+
+function PullPlanCalendarView() {
   const [view, setView] = useState<CalendarViewMode>("day");
   const [actionError, setActionError] = useState<string | null>(null);
   const calendarRootRef = useRef<HTMLDivElement>(null);
@@ -295,9 +391,14 @@ export function PullPlanCalendar() {
     };
   }, [events, tasks]);
 
-  const calendarKey = `${events.map((e) => e.id).join(",")}|${tasks
-    .map((t) => t.id)
-    .join(",")}`;
+  const { color: pendingCreateColor } = useEventCreateColor();
+  const calendarKey = `${events
+    .map((e) => `${e.id}:${e.color ?? ""}`)
+    .join(",")}|${tasks.map((t) => t.id).join(",")}`;
+  const eventColorsCss = useMemo(
+    () => eventColorCss(scheduledEvents),
+    [scheduledEvents],
+  );
 
   useEffect(() => {
     const root = calendarRootRef.current;
@@ -321,6 +422,7 @@ export function PullPlanCalendar() {
         title: payload.title.trim() || "Untitled event",
         start: payload.start.toISOString(),
         end: payload.end.toISOString(),
+        color: pendingCreateColor,
       });
     } catch (err) {
       const message =
@@ -389,6 +491,7 @@ export function PullPlanCalendar() {
           }
         }}
       >
+      {eventColorsCss ? <style>{eventColorsCss}</style> : null}
       <Calendar
         key={calendarKey}
         showSwitcher={true}

@@ -2,11 +2,18 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { EventSource } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { GoogleCalendarIntegrationService } from './google-calendar-integration.service';
+import {
+  GOOGLE_EVENT_COLOR_FALLBACK,
+  GOOGLE_EVENT_COLORS,
+  resolveGoogleEventColor,
+  toGoogleDisplayColor,
+} from './google-event-colors';
 
 type GoogleCalendarEvent = {
   id?: string;
   status?: string;
   summary?: string;
+  colorId?: string;
   start?: { dateTime?: string; date?: string };
   end?: { dateTime?: string; date?: string };
 };
@@ -15,6 +22,21 @@ type GoogleEventsListResponse = {
   items?: GoogleCalendarEvent[];
   nextPageToken?: string;
   error?: { message?: string };
+};
+
+type GoogleColorsResponse = {
+  event?: Record<string, { background?: string }>;
+  error?: { message?: string };
+};
+
+type GoogleCalendarListEntry = {
+  backgroundColor?: string;
+  error?: { message?: string };
+};
+
+type GoogleColorContext = {
+  eventColors: Record<string, string>;
+  calendarColor: string;
 };
 
 export type GoogleCalendarSyncResult = {
@@ -43,17 +65,16 @@ export class GoogleCalendarSyncService {
     const timeMax = new Date();
     timeMax.setDate(timeMax.getDate() + syncDaysForward);
 
-    const events = await this.fetchPrimaryCalendarEvents(
-      accessToken,
-      timeMin,
-      timeMax,
-    );
+    const [events, colorContext] = await Promise.all([
+      this.fetchPrimaryCalendarEvents(accessToken, timeMin, timeMax),
+      this.fetchColorContext(accessToken),
+    ]);
 
     const seenIds = new Set<string>();
     let imported = 0;
     for (const event of events) {
       if (!event.id || event.status === 'cancelled') continue;
-      const mapped = this.mapGoogleEvent(userId, event);
+      const mapped = this.mapGoogleEvent(userId, event, colorContext);
       if (!mapped) continue;
 
       seenIds.add(event.id);
@@ -69,6 +90,7 @@ export class GoogleCalendarSyncService {
           title: mapped.title,
           start: mapped.start,
           end: mapped.end,
+          color: mapped.color,
           source: EventSource.google,
           taskId: null,
         },
@@ -86,6 +108,53 @@ export class GoogleCalendarSyncService {
     });
 
     return { imported, syncedAt: syncedAt.toISOString() };
+  }
+
+  private async fetchColorContext(
+    accessToken: string,
+  ): Promise<GoogleColorContext> {
+    const [eventColors, calendarColor] = await Promise.all([
+      this.fetchEventColors(accessToken),
+      this.fetchPrimaryCalendarColor(accessToken),
+    ]);
+    return { eventColors, calendarColor };
+  }
+
+  private async fetchEventColors(
+    accessToken: string,
+  ): Promise<Record<string, string>> {
+    try {
+      const res = await fetch('https://www.googleapis.com/calendar/v3/colors', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const data = (await res.json()) as GoogleColorsResponse;
+      if (!res.ok) return { ...GOOGLE_EVENT_COLORS };
+
+      const fromApi: Record<string, string> = { ...GOOGLE_EVENT_COLORS };
+      for (const [id, value] of Object.entries(data.event ?? {})) {
+        const hex = toGoogleDisplayColor(value.background);
+        if (hex) fromApi[id] = hex;
+      }
+      return fromApi;
+    } catch {
+      return { ...GOOGLE_EVENT_COLORS };
+    }
+  }
+
+  private async fetchPrimaryCalendarColor(accessToken: string): Promise<string> {
+    try {
+      const res = await fetch(
+        'https://www.googleapis.com/calendar/v3/users/me/calendarList/primary',
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+      const data = (await res.json()) as GoogleCalendarListEntry;
+      if (!res.ok) return GOOGLE_EVENT_COLOR_FALLBACK;
+      return (
+        toGoogleDisplayColor(data.backgroundColor) ?? GOOGLE_EVENT_COLOR_FALLBACK
+      );
+    } catch {
+      return GOOGLE_EVENT_COLOR_FALLBACK;
+    }
   }
 
   private async fetchPrimaryCalendarEvents(
@@ -168,6 +237,7 @@ export class GoogleCalendarSyncService {
   private mapGoogleEvent(
     userId: string,
     event: GoogleCalendarEvent,
+    colors: GoogleColorContext,
   ): {
     userId: string;
     title: string;
@@ -175,6 +245,7 @@ export class GoogleCalendarSyncService {
     end: Date;
     googleEventId: string;
     source: EventSource;
+    color: string;
     taskId: null;
   } | null {
     if (!event.id) return null;
@@ -190,6 +261,11 @@ export class GoogleCalendarSyncService {
       end: end > start ? end : start,
       googleEventId: event.id,
       source: EventSource.google,
+      color: resolveGoogleEventColor(
+        event.colorId,
+        colors.eventColors,
+        colors.calendarColor,
+      ),
       taskId: null,
     };
   }

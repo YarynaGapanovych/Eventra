@@ -82,6 +82,7 @@ export function useUpdateEventMutation() {
           end: input.end ?? "",
           source: "eventra" as const,
           googleEventId: null,
+          color: input.color ?? null,
           taskId: null,
         };
       }
