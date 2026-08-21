@@ -154,6 +154,8 @@ type Mutation {
   disconnectGoogleCalendar: GoogleCalendarDisconnectPayload!
   login(input: LoginInput!): AuthPayload!
   register(input: RegisterInput!): AuthPayload!
+  requestPasswordReset(input: RequestPasswordResetInput!): Boolean!
+  resetPassword(input: ResetPasswordInput!): Boolean!
   scheduleTask(input: ScheduleTaskInput!): Event!
   startGoogleCalendarConnect(input: StartGoogleCalendarConnectInput): GoogleCalendarConnectPayload!
   syncGoogleCalendar: GoogleCalendarSyncPayload!
@@ -178,6 +180,15 @@ input RegisterInput {
   email: String!
   name: String
   password: String!
+}
+
+input RequestPasswordResetInput {
+  email: String!
+}
+
+input ResetPasswordInput {
+  password: String!
+  token: String!
 }
 
 input ScheduleTaskInput {

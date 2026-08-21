@@ -39,13 +39,15 @@ enum GuestResponse {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String?
-  googleId     String?  @unique
-  name         String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                     String    @id @default(cuid())
+  email                  String    @unique
+  passwordHash           String?
+  googleId               String?   @unique
+  name                   String?
+  passwordResetTokenHash String?
+  passwordResetExpiresAt DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
   googleCalendarIntegration GoogleCalendarIntegration?
   userSettings              UserSettings?

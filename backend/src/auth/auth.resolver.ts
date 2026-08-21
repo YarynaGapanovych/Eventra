@@ -5,6 +5,8 @@ import { AuthPayload, AuthUser } from "./auth.types";
 import { CurrentUser } from "./current-user.decorator";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
+import { RequestPasswordResetDto } from "./dto/request-password-reset.dto";
+import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { GqlAuthGuard } from "./gql-auth.guard";
 import type { JwtUser } from "./jwt-user";
 
@@ -27,6 +29,18 @@ export class AuthResolver {
   @Mutation(() => AuthPayload)
   login(@Args("input") input: LoginDto): Promise<AuthPayload> {
     return this.authService.login(input);
+  }
+
+  @Mutation(() => Boolean)
+  requestPasswordReset(
+    @Args("input") input: RequestPasswordResetDto,
+  ): Promise<boolean> {
+    return this.authService.requestPasswordReset(input);
+  }
+
+  @Mutation(() => Boolean)
+  resetPassword(@Args("input") input: ResetPasswordDto): Promise<boolean> {
+    return this.authService.resetPassword(input);
   }
 
   @Mutation(() => AuthPayload)
