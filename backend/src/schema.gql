@@ -2,6 +2,16 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
+input AssistantMessageInput {
+  content: String!
+  role: String!
+}
+
+type AssistantReply {
+  content: String!
+  didMutate: Boolean!
+}
+
 type AuthPayload {
   accessToken: String!
   user: AuthUser!
@@ -147,6 +157,7 @@ input LoginInput {
 }
 
 type Mutation {
+  askAssistant(messages: [AssistantMessageInput!]!): AssistantReply!
   completeGoogleLogin(code: String!): AuthPayload!
   createEvent(input: CreateEventInput!): Event!
   createTask(input: CreateTaskInput!): Task!

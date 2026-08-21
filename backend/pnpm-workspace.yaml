@@ -1,5 +1,7 @@
 allowBuilds:
   "@apollo/protobufjs": true
+  "@google/genai": false
   "@nestjs/core": true
   "@prisma/engines": true
   prisma: true
+  protobufjs: false
