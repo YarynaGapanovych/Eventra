@@ -8,8 +8,8 @@ import {
   type EventDetailsFormValues,
 } from "@/components/event-details-form";
 import { Button } from "@/components/ui/button";
-import { useEventsQuery, useUpdateEventMutation } from "@/hooks/use-events";
-import { useTasksQuery, useUpdateTaskMutation } from "@/hooks/use-tasks";
+import { useDeleteEventMutation, useEventsQuery, useUpdateEventMutation } from "@/hooks/use-events";
+import { useDeleteTaskMutation, useTasksQuery, useUpdateTaskMutation } from "@/hooks/use-tasks";
 import { useUserSettingsQuery } from "@/hooks/use-user-settings";
 import { DEFAULT_APP_SETTINGS, getDefaultTimezone } from "@/lib/app-settings";
 import { parseMasterEventId } from "@/lib/calendar-details";
@@ -42,6 +42,8 @@ export function CalendarEventDetailModal({
   const { data: tasks = [] } = useTasksQuery();
   const updateEventMutation = useUpdateEventMutation();
   const updateTaskMutation = useUpdateTaskMutation();
+  const deleteEventMutation = useDeleteEventMutation();
+  const deleteTaskMutation = useDeleteTaskMutation();
 
   const source = typeof task?.source === "string" ? task.source : null;
   const kind = typeof task?.kind === "string" ? task.kind : null;
@@ -193,6 +195,40 @@ export function CalendarEventDetailModal({
     }
   }
 
+  async function handleDelete() {
+    setError(null);
+    try {
+      if (isUnscheduled && apiTask) {
+        await deleteTaskMutation.mutateAsync(apiTask.id);
+        syncEntityReminders({
+          entityId: apiTask.id,
+          title: apiTask.name,
+          startIso: null,
+          minutesBefore: [],
+        });
+        for (const event of apiTask.events) {
+          syncEntityReminders({
+            entityId: parseMasterEventId(event.id),
+            title: event.title,
+            startIso: null,
+            minutesBefore: [],
+          });
+        }
+      } else if (masterId && !isGoogle) {
+        await deleteEventMutation.mutateAsync(eventId ?? masterId);
+        syncEntityReminders({
+          entityId: masterId,
+          title: apiEvent?.title ?? "Event",
+          startIso: null,
+          minutesBefore: [],
+        });
+      }
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete.");
+    }
+  }
+
   if (!isOpen || !values) return null;
 
   const heading = isUnscheduled
@@ -254,6 +290,24 @@ export function CalendarEventDetailModal({
             onChange={setValues}
             onSubmit={handleSubmit}
             onCancel={onClose}
+            onDelete={
+              readOnly
+                ? undefined
+                : isUnscheduled && apiTask
+                  ? handleDelete
+                  : masterId
+                    ? handleDelete
+                    : undefined
+            }
+            deleteLabel={isUnscheduled ? "Delete task" : "Delete event"}
+            deleteConfirmHint={
+              isUnscheduled && (apiTask?.events.length ?? 0) > 0
+                ? `${apiTask?.events.length} calendar block${apiTask?.events.length === 1 ? "" : "s"} will be removed.`
+                : undefined
+            }
+            deleting={
+              deleteEventMutation.isPending || deleteTaskMutation.isPending
+            }
             submitLabel="Save"
             readOnly={readOnly}
             showTaskFields={showTaskFields}

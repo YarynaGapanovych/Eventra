@@ -13,4 +13,5 @@ export { UPDATE_USER_SETTINGS_MUTATION } from "./update-user-settings";
 export { CREATE_EVENT_MUTATION } from "./create-event";
 export { UPDATE_EVENT_MUTATION } from "./update-event";
 export { DELETE_EVENT_MUTATION } from "./delete-event";
+export { DELETE_TASK_MUTATION } from "./delete-task";
 export { SCHEDULE_TASK_MUTATION } from "./schedule-task";

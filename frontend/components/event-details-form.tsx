@@ -295,6 +295,10 @@ type Props = {
   onChange: (values: EventDetailsFormValues) => void;
   onSubmit: (values: EventDetailsFormValues) => void | Promise<void>;
   onCancel?: () => void;
+  onDelete?: () => void | Promise<void>;
+  deleteLabel?: string;
+  deleteConfirmHint?: string;
+  deleting?: boolean;
   submitLabel?: string;
   readOnly?: boolean;
   showTaskFields?: boolean;
@@ -326,6 +330,10 @@ export function EventDetailsForm({
   onChange,
   onSubmit,
   onCancel,
+  onDelete,
+  deleteLabel = "Delete",
+  deleteConfirmHint,
+  deleting = false,
   submitLabel = "Save",
   readOnly = false,
   showTaskFields = false,
@@ -335,6 +343,7 @@ export function EventDetailsForm({
 }: Props) {
   const id = useId();
   const [guestEmail, setGuestEmail] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [showConference, setShowConference] = useState(
     Boolean(values.conferenceUrl),
   );
@@ -772,20 +781,58 @@ export function EventDetailsForm({
         </p>
       ) : null}
 
-      <div className="flex justify-end gap-2 pt-2">
-        {onCancel ? (
-          <Button type="button" variant="outline" onClick={onCancel}>
-            {readOnly ? "Close" : "Cancel"}
-          </Button>
-        ) : null}
-        {readOnly ? null : (
-          <Button
-            type="submit"
-            disabled={submitting || !values.title.trim()}
-          >
-            {submitting ? "Saving…" : submitLabel}
-          </Button>
+      <div className="flex items-center justify-between gap-3 pt-2">
+        {onDelete && !readOnly ? (
+          <div className="min-w-0">
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleting || submitting}
+              onClick={() => {
+                if (!confirmDelete) {
+                  setConfirmDelete(true);
+                  return;
+                }
+                void onDelete();
+              }}
+            >
+              {deleting
+                ? "Deleting…"
+                : confirmDelete
+                  ? "Confirm delete"
+                  : deleteLabel}
+            </Button>
+            {confirmDelete && deleteConfirmHint ? (
+              <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+                {deleteConfirmHint}
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <span />
         )}
+        <div className="flex justify-end gap-2">
+          {onCancel ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setConfirmDelete(false);
+                onCancel();
+              }}
+            >
+              {readOnly ? "Close" : "Cancel"}
+            </Button>
+          ) : null}
+          {readOnly ? null : (
+            <Button
+              type="submit"
+              disabled={submitting || deleting || !values.title.trim()}
+            >
+              {submitting ? "Saving…" : submitLabel}
+            </Button>
+          )}
+        </div>
       </div>
     </form>
   );

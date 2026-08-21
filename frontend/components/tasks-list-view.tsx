@@ -38,12 +38,15 @@ function priorityClass(p: ApiTask["priority"]) {
 type Props = {
   tasks: ApiTask[];
   onEdit: (task: ApiTask) => void;
+  onDelete: (task: ApiTask) => void;
+  deletingId?: string | null;
 };
 
-export function TasksListView({ tasks, onEdit }: Props) {
+export function TasksListView({ tasks, onEdit, onDelete, deletingId }: Props) {
   const [sorting, setSorting] = useState<SortingState>([
     { id: "deadline", desc: false },
   ]);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   const columns = useMemo<ColumnDef<ApiTask>[]>(
     () => [
@@ -157,21 +160,52 @@ export function TasksListView({ tasks, onEdit }: Props) {
         id: "actions",
         enableSorting: false,
         header: () => <span className="block text-right">Actions</span>,
-        cell: ({ row }) => (
-          <div className="text-right">
-            <Button
-              type="button"
-              variant="outline"
-              size="xs"
-              onClick={() => onEdit(row.original)}
-            >
-              Edit
-            </Button>
-          </div>
-        ),
+        cell: ({ row }) => {
+          const task = row.original;
+          const confirming = confirmingId === task.id;
+          const deleting = deletingId === task.id;
+          const blockCount = task.events.length;
+          return (
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                onClick={() => onEdit(task)}
+              >
+                Edit
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                size="xs"
+                disabled={deleting}
+                onClick={() => {
+                  if (!confirming) {
+                    setConfirmingId(task.id);
+                    return;
+                  }
+                  setConfirmingId(null);
+                  onDelete(task);
+                }}
+                title={
+                  confirming && blockCount > 0
+                    ? `${blockCount} calendar block${blockCount === 1 ? "" : "s"} will be removed.`
+                    : undefined
+                }
+              >
+                {deleting
+                  ? "Deleting…"
+                  : confirming
+                    ? "Confirm delete"
+                    : "Delete"}
+              </Button>
+            </div>
+          );
+        },
       },
     ],
-    [onEdit],
+    [onEdit, onDelete, confirmingId, deletingId],
   );
 
   // eslint-disable-next-line react-hooks/incompatible-library -- shadcn data-table pattern uses TanStack's table instance
