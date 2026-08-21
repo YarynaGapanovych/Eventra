@@ -1,5 +1,7 @@
 export { LOGIN_MUTATION } from "./login";
 export { REGISTER_MUTATION } from "./register";
+export { REQUEST_PASSWORD_RESET_MUTATION } from "./request-password-reset";
+export { RESET_PASSWORD_MUTATION } from "./reset-password";
 export { CREATE_TASK_MUTATION } from "./create-task";
 export { UPDATE_TASK_MUTATION } from "./update-task";
 export { COMPLETE_GOOGLE_LOGIN_MUTATION } from "./complete-google-login";

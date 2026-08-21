@@ -1,5 +1,10 @@
 import { graphqlRequest } from "@/lib/graphql";
-import { LOGIN_MUTATION, REGISTER_MUTATION } from "@/lib/graphql/mutations";
+import {
+  LOGIN_MUTATION,
+  REGISTER_MUTATION,
+  REQUEST_PASSWORD_RESET_MUTATION,
+  RESET_PASSWORD_MUTATION,
+} from "@/lib/graphql/mutations";
 import type { AuthUser, StoredAuth } from "@/lib/auth-storage";
 
 export {
@@ -42,4 +47,27 @@ export async function apiLogin(
     throw new Error("Invalid email or password");
   }
   return { token: payload.accessToken, user: payload.user };
+}
+
+export async function apiRequestPasswordReset(email: string): Promise<void> {
+  const data = await graphqlRequest<{ requestPasswordReset?: boolean }>(
+    REQUEST_PASSWORD_RESET_MUTATION,
+    { input: { email } },
+  );
+  if (!data.requestPasswordReset) {
+    throw new Error("Could not send reset link.");
+  }
+}
+
+export async function apiResetPassword(
+  token: string,
+  password: string,
+): Promise<void> {
+  const data = await graphqlRequest<{ resetPassword?: boolean }>(
+    RESET_PASSWORD_MUTATION,
+    { input: { token, password } },
+  );
+  if (!data.resetPassword) {
+    throw new Error("Could not update password.");
+  }
 }
