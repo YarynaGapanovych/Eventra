@@ -267,6 +267,17 @@ export class TasksService {
     return this.toDto(updated);
   }
 
+  async deleteForUser(userId: string, id: string): Promise<boolean> {
+    const existing = await this.prisma.task.findFirst({
+      where: { id, userId },
+    });
+    if (!existing) {
+      throw new NotFoundException('Task not found');
+    }
+    await this.prisma.task.delete({ where: { id: existing.id } });
+    return true;
+  }
+
   private toDto(task: TaskWithDetails): Task {
     return {
       id: task.id,

@@ -151,6 +151,7 @@ type Mutation {
   createEvent(input: CreateEventInput!): Event!
   createTask(input: CreateTaskInput!): Task!
   deleteEvent(id: String!): Boolean!
+  deleteTask(id: String!): Boolean!
   disconnectGoogleCalendar: GoogleCalendarDisconnectPayload!
   login(input: LoginInput!): AuthPayload!
   register(input: RegisterInput!): AuthPayload!
