@@ -1,115 +1,14 @@
 "use client";
 
-import { Search, User } from "lucide-react";
+import { User } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import {
-  Suspense,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type FormEvent,
-} from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
+import { AssistantChat } from "@/components/assistant-chat";
 import { NotificationsCenter } from "@/components/notifications-center";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/stores/auth-store";
-import { cn } from "@/lib/utils";
-
-function HeaderSearchSkeleton() {
-  return (
-    <div
-      className="h-9 min-w-0 flex-1 max-w-md rounded-lg bg-zinc-100/90 dark:bg-zinc-800/80"
-      aria-hidden
-    />
-  );
-}
-
-function HeaderSearch() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const [value, setValue] = useState("");
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useLayoutEffect(() => {
-    /* eslint-disable react-hooks/set-state-in-effect -- keep field in sync with ?q when route changes */
-    if (pathname === "/tasks") {
-      setValue(searchParams.get("q") ?? "");
-    } else {
-      setValue("");
-    }
-    /* eslint-enable react-hooks/set-state-in-effect */
-  }, [pathname, searchParams]);
-
-  useEffect(() => {
-    if (pathname !== "/tasks") return;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      debounceRef.current = null;
-      const trimmed = value.trim();
-      const current = (searchParams.get("q") ?? "").trim();
-      if (trimmed === current) return;
-      const p = new URLSearchParams(searchParams.toString());
-      if (trimmed) p.set("q", trimmed);
-      else p.delete("q");
-      const qs = p.toString();
-      router.replace(qs ? `/tasks?${qs}` : "/tasks", { scroll: false });
-    }, 300);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [value, pathname, router, searchParams]);
-
-  function commitToTasks(trimmed: string) {
-    if (pathname === "/tasks") {
-      const p = new URLSearchParams(searchParams.toString());
-      if (trimmed) p.set("q", trimmed);
-      else p.delete("q");
-      const qs = p.toString();
-      router.replace(qs ? `/tasks?${qs}` : "/tasks", { scroll: false });
-    } else {
-      router.push(
-        trimmed ? `/tasks?q=${encodeURIComponent(trimmed)}` : "/tasks",
-      );
-    }
-  }
-
-  function onSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    commitToTasks(value.trim());
-  }
-
-  return (
-    <form
-      role="search"
-      onSubmit={onSubmit}
-      className="mx-auto min-w-0 w-full max-w-md sm:mx-0"
-    >
-      <div className="relative">
-        <Search
-          className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-zinc-400 dark:text-zinc-500"
-          aria-hidden
-        />
-        <Input
-          type="search"
-          name="q"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder="Search tasks…"
-          autoComplete="off"
-          aria-label="Search tasks"
-          className={cn(
-            "h-9 w-full min-w-0 border-zinc-200 bg-white/90 pl-9 pr-3 text-sm dark:border-zinc-700 dark:bg-zinc-950/80",
-            "[&::-webkit-search-cancel-button]:cursor-pointer",
-          )}
-        />
-      </div>
-    </form>
-  );
-}
 
 function userDisplayName(user: {
   name: string | null;
@@ -212,14 +111,11 @@ export function SiteHeader() {
           Eventra
         </Link>
 
-        <Suspense fallback={<HeaderSearchSkeleton />}>
-          <HeaderSearch />
-        </Suspense>
-
         <nav
           className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2 sm:gap-3"
           aria-label="Account"
         >
+          <AssistantChat />
           <NotificationsCenter />
           <AccountMenu />
         </nav>

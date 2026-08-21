@@ -1,3 +1,4 @@
+export { ASK_ASSISTANT_MUTATION } from "./ask-assistant";
 export { LOGIN_MUTATION } from "./login";
 export { REGISTER_MUTATION } from "./register";
 export { REQUEST_PASSWORD_RESET_MUTATION } from "./request-password-reset";
