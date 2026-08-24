@@ -3,4 +3,5 @@ export const queryKeys = {
   events: ["events"] as const,
   googleCalendarStatus: ["googleCalendarStatus"] as const,
   userSettings: ["userSettings"] as const,
+  assistantThread: ["assistantThread"] as const,
 };

@@ -1,4 +1,4 @@
-import { apiLogin, apiRegister } from "@/lib/auth-api";
+import { apiLogin, apiRegister, apiRequestPasswordReset, apiResetPassword } from "@/lib/auth-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useMutation } from "@tanstack/react-query";
 
@@ -19,5 +19,18 @@ export function useRegisterMutation() {
     mutationFn: (input: { email: string; password: string; name?: string }) =>
       apiRegister(input),
     onSuccess: setSession,
+  });
+}
+
+export function useRequestPasswordResetMutation() {
+  return useMutation({
+    mutationFn: (email: string) => apiRequestPasswordReset(email),
+  });
+}
+
+export function useResetPasswordMutation() {
+  return useMutation({
+    mutationFn: ({ token, password }: { token: string; password: string }) =>
+      apiResetPassword(token, password),
   });
 }

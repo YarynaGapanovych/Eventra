@@ -2,6 +2,23 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
+type AssistantMessage {
+  content: String!
+  createdAt: String!
+  id: String!
+  role: String!
+}
+
+type AssistantReply {
+  content: String!
+  didMutate: Boolean!
+}
+
+type AssistantThread {
+  expiresAt: String
+  messages: [AssistantMessage!]!
+}
+
 type AuthPayload {
   accessToken: String!
   user: AuthUser!
@@ -147,13 +164,18 @@ input LoginInput {
 }
 
 type Mutation {
+  askAssistant(content: String!): AssistantReply!
   completeGoogleLogin(code: String!): AuthPayload!
   createEvent(input: CreateEventInput!): Event!
   createTask(input: CreateTaskInput!): Task!
   deleteEvent(id: String!): Boolean!
+  deleteTask(id: String!): Boolean!
   disconnectGoogleCalendar: GoogleCalendarDisconnectPayload!
   login(input: LoginInput!): AuthPayload!
   register(input: RegisterInput!): AuthPayload!
+  requestPasswordReset(input: RequestPasswordResetInput!): Boolean!
+  resetAssistantThread: Boolean!
+  resetPassword(input: ResetPasswordInput!): Boolean!
   scheduleTask(input: ScheduleTaskInput!): Event!
   startGoogleCalendarConnect(input: StartGoogleCalendarConnectInput): GoogleCalendarConnectPayload!
   syncGoogleCalendar: GoogleCalendarSyncPayload!
@@ -164,6 +186,7 @@ type Mutation {
 }
 
 type Query {
+  assistantThread: AssistantThread!
   events: [Event!]!
   googleCalendarStatus: GoogleCalendarStatus!
   me: AuthUser!
@@ -178,6 +201,15 @@ input RegisterInput {
   email: String!
   name: String
   password: String!
+}
+
+input RequestPasswordResetInput {
+  email: String!
+}
+
+input ResetPasswordInput {
+  password: String!
+  token: String!
 }
 
 input ScheduleTaskInput {

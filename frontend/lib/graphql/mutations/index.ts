@@ -1,5 +1,9 @@
+export { ASK_ASSISTANT_MUTATION } from "./ask-assistant";
+export { RESET_ASSISTANT_THREAD_MUTATION } from "./reset-assistant-thread";
 export { LOGIN_MUTATION } from "./login";
 export { REGISTER_MUTATION } from "./register";
+export { REQUEST_PASSWORD_RESET_MUTATION } from "./request-password-reset";
+export { RESET_PASSWORD_MUTATION } from "./reset-password";
 export { CREATE_TASK_MUTATION } from "./create-task";
 export { UPDATE_TASK_MUTATION } from "./update-task";
 export { COMPLETE_GOOGLE_LOGIN_MUTATION } from "./complete-google-login";
@@ -11,4 +15,5 @@ export { UPDATE_USER_SETTINGS_MUTATION } from "./update-user-settings";
 export { CREATE_EVENT_MUTATION } from "./create-event";
 export { UPDATE_EVENT_MUTATION } from "./update-event";
 export { DELETE_EVENT_MUTATION } from "./delete-event";
+export { DELETE_TASK_MUTATION } from "./delete-task";
 export { SCHEDULE_TASK_MUTATION } from "./schedule-task";

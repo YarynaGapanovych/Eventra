@@ -2,12 +2,14 @@ import { getStoredAuth } from "@/lib/auth-storage";
 import { graphqlRequest } from "@/lib/graphql";
 import {
   CREATE_TASK_MUTATION,
+  DELETE_TASK_MUTATION,
   UPDATE_TASK_MUTATION,
 } from "@/lib/graphql/mutations";
 import { TASKS_QUERY } from "@/lib/graphql/queries";
 import { queryKeys } from "@/lib/query-keys";
 import {
   buildMockTasks,
+  isMockTaskId,
   normalizeApiTask,
   tasksUseMocks,
   type ApiTask,
@@ -71,6 +73,29 @@ export function useUpdateTaskMutation() {
         { id, input },
       );
       return normalizeApiTask(data.updateTask);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tasks });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.events });
+    },
+  });
+}
+
+export function useDeleteTaskMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      if (isMockTaskId(id)) {
+        return true;
+      }
+      const data = await graphqlRequest<{ deleteTask?: boolean }>(
+        DELETE_TASK_MUTATION,
+        { id },
+      );
+      if (!data.deleteTask) {
+        throw new Error("Could not delete task.");
+      }
+      return true;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks });

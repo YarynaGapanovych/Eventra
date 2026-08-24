@@ -39,16 +39,19 @@ enum GuestResponse {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String?
-  googleId     String?  @unique
-  name         String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                     String    @id @default(cuid())
+  email                  String    @unique
+  passwordHash           String?
+  googleId               String?   @unique
+  name                   String?
+  passwordResetTokenHash String?
+  passwordResetExpiresAt DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
   googleCalendarIntegration GoogleCalendarIntegration?
   userSettings              UserSettings?
+  assistantThread           AssistantThread?
   tasks                     Task[]
   events                    Event[]
 }
@@ -185,4 +188,24 @@ model TaskReminder {
   minutesBefore Int
 
   @@index([taskId])
+}
+
+model AssistantThread {
+  id        String              @id @default(cuid())
+  userId    String              @unique
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  AssistantMessage[]
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+}
+
+model AssistantMessage {
+  id        String          @id @default(cuid())
+  threadId  String
+  thread    AssistantThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  role      String
+  content   String
+  createdAt DateTime        @default(now())
+
+  @@index([threadId, createdAt])
 }

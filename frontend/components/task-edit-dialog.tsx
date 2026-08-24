@@ -11,10 +11,11 @@ import { Button } from "@/components/ui/button";
 import { useUserSettingsQuery } from "@/hooks/use-user-settings";
 import {
   useCreateTaskMutation,
+  useDeleteTaskMutation,
   useUpdateTaskMutation,
 } from "@/hooks/use-tasks";
 import { DEFAULT_APP_SETTINGS, getDefaultTimezone } from "@/lib/app-settings";
-import { EMPTY_CALENDAR_DETAILS } from "@/lib/calendar-details";
+import { EMPTY_CALENDAR_DETAILS, parseMasterEventId } from "@/lib/calendar-details";
 import { DEFAULT_EVENTRA_EVENT_COLOR } from "@/lib/event-colors";
 import { syncEntityReminders } from "@/lib/reminder-storage";
 import {
@@ -42,6 +43,7 @@ type Props = {
   onSaved: () => void;
   mockPersist?: boolean;
   onMockPersist?: (task: ApiTask) => void;
+  onMockDelete?: (taskId: string) => void;
 };
 
 export function TaskEditDialog({
@@ -52,6 +54,7 @@ export function TaskEditDialog({
   onSaved,
   mockPersist = false,
   onMockPersist,
+  onMockDelete,
 }: Props) {
   const settingsQuery = useUserSettingsQuery();
   const timezone = settingsQuery.data?.timezone ?? getDefaultTimezone();
@@ -65,6 +68,7 @@ export function TaskEditDialog({
   const [error, setError] = useState<string | null>(null);
   const createTaskMutation = useCreateTaskMutation();
   const updateTaskMutation = useUpdateTaskMutation();
+  const deleteTaskMutation = useDeleteTaskMutation();
 
   useEffect(() => {
     if (!open) return;
@@ -245,6 +249,36 @@ export function TaskEditDialog({
     }
   }
 
+  async function handleDelete() {
+    if (mode !== "edit" || !task) return;
+    setError(null);
+    try {
+      if (mockPersist && isMockTaskId(task.id)) {
+        onMockDelete?.(task.id);
+      } else {
+        await deleteTaskMutation.mutateAsync(task.id);
+      }
+      syncEntityReminders({
+        entityId: task.id,
+        title: task.name,
+        startIso: null,
+        minutesBefore: [],
+      });
+      for (const event of task.events) {
+        syncEntityReminders({
+          entityId: parseMasterEventId(event.id),
+          title: event.title,
+          startIso: null,
+          minutesBefore: [],
+        });
+      }
+      onSaved();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete.");
+    }
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -291,6 +325,14 @@ export function TaskEditDialog({
             onChange={setValues}
             onSubmit={submit}
             onCancel={onClose}
+            onDelete={mode === "edit" && task ? handleDelete : undefined}
+            deleteLabel="Delete task"
+            deleteConfirmHint={
+              blockCount > 0
+                ? `${blockCount} calendar block${blockCount === 1 ? "" : "s"} will be removed.`
+                : undefined
+            }
+            deleting={deleteTaskMutation.isPending}
             submitLabel={mode === "create" ? "Create" : "Save"}
             showTaskFields
             timesOptional

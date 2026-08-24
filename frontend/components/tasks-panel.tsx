@@ -4,7 +4,9 @@ import { TaskEditDialog } from "@/components/task-edit-dialog";
 import { TasksKanbanView } from "@/components/tasks-kanban-view";
 import { TasksListView } from "@/components/tasks-list-view";
 import { Button } from "@/components/ui/button";
-import { useTasksQuery, useUpdateTaskMutation } from "@/hooks/use-tasks";
+import { useDeleteTaskMutation, useTasksQuery, useUpdateTaskMutation } from "@/hooks/use-tasks";
+import { parseMasterEventId } from "@/lib/calendar-details";
+import { syncEntityReminders } from "@/lib/reminder-storage";
 import { getStoredAuth } from "@/lib/auth-api";
 import {
   isMockTaskId,
@@ -45,6 +47,7 @@ export function TasksPanel({ query = "" }: { query?: string }) {
     error: queryError,
   } = useTasksQuery();
   const updateTaskMutation = useUpdateTaskMutation();
+  const deleteTaskMutation = useDeleteTaskMutation();
   const [localTasks, setLocalTasks] = useState<ApiTask[] | null>(null);
   const tasks = mockActive && localTasks ? localTasks : queryTasks;
 
@@ -102,6 +105,42 @@ export function TasksPanel({ query = "" }: { query?: string }) {
           : base.map((t, i) => (i === idx ? updated : t));
       return [...next].sort((a, b) => a.name.localeCompare(b.name));
     });
+  }
+
+  function removePersistedTask(taskId: string) {
+    setLocalTasks((prev) => (prev ?? queryTasks).filter((t) => t.id !== taskId));
+  }
+
+  function clearTaskReminders(task: ApiTask) {
+    syncEntityReminders({
+      entityId: task.id,
+      title: task.name,
+      startIso: null,
+      minutesBefore: [],
+    });
+    for (const event of task.events) {
+      syncEntityReminders({
+        entityId: parseMasterEventId(event.id),
+        title: event.title,
+        startIso: null,
+        minutesBefore: [],
+      });
+    }
+  }
+
+  async function handleDelete(task: ApiTask) {
+    try {
+      setActionError(null);
+      if (mockActive && isMockTaskId(task.id)) {
+        removePersistedTask(task.id);
+        clearTaskReminders(task);
+        return;
+      }
+      await deleteTaskMutation.mutateAsync(task.id);
+      clearTaskReminders(task);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Could not delete task.");
+    }
   }
 
   return (
@@ -212,7 +251,12 @@ export function TasksPanel({ query = "" }: { query?: string }) {
           </Link>
         </div>
       ) : view === "list" ? (
-        <TasksListView tasks={filteredTasks} onEdit={openEdit} />
+        <TasksListView
+          tasks={filteredTasks}
+          onEdit={openEdit}
+          onDelete={handleDelete}
+          deletingId={deleteTaskMutation.isPending ? deleteTaskMutation.variables : null}
+        />
       ) : (
         <TasksKanbanView
           tasks={filteredTasks}
@@ -227,6 +271,7 @@ export function TasksPanel({ query = "" }: { query?: string }) {
         task={editing}
         mockPersist={mockActive}
         onMockPersist={mergePersistedTask}
+        onMockDelete={removePersistedTask}
         onClose={() => setDialogOpen(false)}
         onSaved={() => {
           setActionError(null);

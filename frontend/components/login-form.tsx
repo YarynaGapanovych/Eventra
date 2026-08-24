@@ -21,9 +21,14 @@ type LoginFormValues = z.infer<typeof loginFormSchema>;
 type LoginFormProps = {
   onSuccess: () => void;
   onRequestRegister: () => void;
+  onRequestForgotPassword: () => void;
 };
 
-export function LoginForm({ onSuccess, onRequestRegister }: LoginFormProps) {
+export function LoginForm({
+  onSuccess,
+  onRequestRegister,
+  onRequestForgotPassword,
+}: LoginFormProps) {
   const login = useLoginMutation();
   const { register, handleSubmit, setError, clearErrors, formState } =
     useForm<LoginFormValues>({
@@ -84,12 +89,25 @@ export function LoginForm({ onSuccess, onRequestRegister }: LoginFormProps) {
       </div>
 
       <div className="space-y-2.5">
-        <Label
-          htmlFor="auth-password"
-          className="text-lg font-medium text-zinc-900 dark:text-zinc-100"
-        >
-          Password
-        </Label>
+        <div className="flex items-center justify-between gap-3">
+          <Label
+            htmlFor="auth-password"
+            className="text-lg font-medium text-zinc-900 dark:text-zinc-100"
+          >
+            Password
+          </Label>
+          <Button
+            type="button"
+            variant="link"
+            className="h-auto min-h-0 cursor-pointer px-0.5 py-0 text-sm font-semibold text-teal-700 underline-offset-4 hover:underline dark:text-teal-400"
+            onClick={() => {
+              clearErrors("root");
+              onRequestForgotPassword();
+            }}
+          >
+            Forgot password?
+          </Button>
+        </div>
         <Input
           id="auth-password"
           type="password"

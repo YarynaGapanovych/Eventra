@@ -39,4 +39,12 @@ export class TasksResolver {
   ): Promise<Task> {
     return this.tasksService.updateForUser(user.userId, id, input);
   }
+
+  @Mutation(() => Boolean)
+  deleteTask(
+    @CurrentUser() user: JwtUser,
+    @Args('id') id: string,
+  ): Promise<boolean> {
+    return this.tasksService.deleteForUser(user.userId, id);
+  }
 }

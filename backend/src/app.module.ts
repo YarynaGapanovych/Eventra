@@ -10,6 +10,7 @@ import { RootResolver } from './root.resolver';
 import { EventsModule } from './events/events.module';
 import { TasksModule } from './tasks/tasks.module';
 import { UserSettingsModule } from './user-settings/user-settings.module';
+import { AiModule } from './ai/ai.module';
 
 const isProd = process.env.NODE_ENV === 'production';
 
@@ -31,6 +32,7 @@ const isProd = process.env.NODE_ENV === 'production';
     EventsModule,
     TasksModule,
     UserSettingsModule,
+    AiModule,
   ],
   providers: [RootResolver],
 })

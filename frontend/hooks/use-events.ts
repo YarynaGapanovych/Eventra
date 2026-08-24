@@ -2,6 +2,7 @@ import { getStoredAuth } from "@/lib/auth-storage";
 import { graphqlRequest } from "@/lib/graphql";
 import {
   CREATE_EVENT_MUTATION,
+  DELETE_EVENT_MUTATION,
   SCHEDULE_TASK_MUTATION,
   UPDATE_EVENT_MUTATION,
 } from "@/lib/graphql/mutations";
@@ -118,6 +119,26 @@ export function useScheduleTaskMutation() {
         { input },
       );
       return normalizeApiEvent(data.scheduleTask);
+    },
+    onSuccess: () => invalidateCalendar(queryClient),
+  });
+}
+
+export function useDeleteEventMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      if (isMockEventId(id)) {
+        return true;
+      }
+      const data = await graphqlRequest<{ deleteEvent?: boolean }>(
+        DELETE_EVENT_MUTATION,
+        { id },
+      );
+      if (!data.deleteEvent) {
+        throw new Error("Could not delete event.");
+      }
+      return true;
     },
     onSuccess: () => invalidateCalendar(queryClient),
   });

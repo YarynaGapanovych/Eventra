@@ -17,6 +17,7 @@
   "dependencies": {
     "@apollo/server": "^5.5.1",
     "@as-integrations/express5": "^1.1.2",
+    "@google/genai": "^2.18.0",
     "@nestjs/apollo": "^13.4.0",
     "@nestjs/common": "^11.0.16",
     "@nestjs/config": "^4.0.2",
@@ -32,6 +33,7 @@
     "graphql": "^16.14.0",
     "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",
+    "resend": "^6.21.0",
     "rxjs": "^7.8.1"
   },
   "devDependencies": {
