@@ -4,15 +4,18 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
   useAskAssistant,
+  useAssistantThreadQuery,
+  useResetAssistantThread,
   type AssistantChatMessage,
 } from "@/hooks/use-assistant";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
-import { Sparkles, X } from "lucide-react";
+import { RotateCcw, Sparkles, X } from "lucide-react";
 import {
   useCallback,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   type FormEvent,
@@ -25,7 +28,7 @@ const EXAMPLES = [
   "What tasks are still todo?",
 ];
 
-type VisibleMessage = AssistantChatMessage & { id: string };
+type VisibleMessage = AssistantChatMessage;
 
 const BOLD_RE = /\*\*(.+?)\*\*/g;
 const BULLET_RE = /^[*+\-]\s+(.*)$/;
@@ -109,25 +112,42 @@ function newId(): string {
 export function AssistantChat({ className }: { className?: string }) {
   const user = useAuthStore((s) => s.user);
   const ask = useAskAssistant();
+  const resetThread = useResetAssistantThread();
   const panelRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
-  const [messages, setMessages] = useState<VisibleMessage[]>([]);
+  const [localMessages, setLocalMessages] = useState<VisibleMessage[] | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const titleId = useId();
+  const threadQuery = useAssistantThreadQuery({
+    enabled: open && Boolean(user),
+  });
+  const serverMessages = useMemo(
+    () => threadQuery.data?.messages ?? [],
+    [threadQuery.data?.messages],
+  );
+  const messages = localMessages ?? serverMessages;
+  const showReset = Boolean(user) && messages.length > 0;
+
+  const closePanel = useCallback(() => {
+    setOpen(false);
+    setLocalMessages(null);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") closePanel();
     };
     const onPointer = (e: MouseEvent) => {
       const t = e.target as Node;
       if (panelRef.current?.contains(t)) return;
       if (buttonRef.current?.contains(t)) return;
-      setOpen(false);
+      closePanel();
     };
     document.addEventListener("keydown", onKey);
     document.addEventListener("mousedown", onPointer);
@@ -135,7 +155,7 @@ export function AssistantChat({ className }: { className?: string }) {
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("mousedown", onPointer);
     };
-  }, [open]);
+  }, [closePanel, open]);
 
   useEffect(() => {
     const last = listRef.current?.lastElementChild;
@@ -145,24 +165,31 @@ export function AssistantChat({ className }: { className?: string }) {
   const send = useCallback(
     async (raw: string) => {
       const content = raw.trim();
-      if (!content || ask.isPending || !user) return;
+      if (!content || ask.isPending || resetThread.isPending || !user) return;
 
-      const nextMessages: VisibleMessage[] = [
-        ...messages,
-        { id: newId(), role: "user", content },
-      ];
-      setMessages(nextMessages);
+      const base = localMessages ?? serverMessages;
+      setLocalMessages([
+        ...base,
+        {
+          id: newId(),
+          role: "user",
+          content,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
       setDraft("");
       setError(null);
 
       try {
-        const payload: AssistantChatMessage[] = nextMessages.map(
-          ({ role, content: text }) => ({ role, content: text }),
-        );
-        const reply = await ask.mutateAsync(payload);
-        setMessages((prev) => [
-          ...prev,
-          { id: newId(), role: "assistant", content: reply.content },
+        const reply = await ask.mutateAsync(content);
+        setLocalMessages((prev) => [
+          ...(prev ?? base),
+          {
+            id: newId(),
+            role: "assistant",
+            content: reply.content,
+            createdAt: new Date().toISOString(),
+          },
         ]);
       } catch (err) {
         setError(
@@ -170,8 +197,21 @@ export function AssistantChat({ className }: { className?: string }) {
         );
       }
     },
-    [ask, messages, user],
+    [ask, localMessages, resetThread.isPending, serverMessages, user],
   );
+
+  const onReset = useCallback(async () => {
+    if (resetThread.isPending || ask.isPending) return;
+    setError(null);
+    try {
+      await resetThread.mutateAsync();
+      setLocalMessages([]);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not reset the conversation.",
+      );
+    }
+  }, [ask.isPending, resetThread]);
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -190,7 +230,10 @@ export function AssistantChat({ className }: { className?: string }) {
           aria-haspopup="dialog"
           aria-controls={open ? titleId : undefined}
           className="text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
-          onClick={() => setOpen((prev) => !prev)}
+          onClick={() => {
+            if (open) closePanel();
+            else setOpen(true);
+          }}
         >
           <Sparkles className="size-[22px]" aria-hidden strokeWidth={2} />
         </Button>
@@ -211,15 +254,29 @@ export function AssistantChat({ className }: { className?: string }) {
             >
               Assistant
             </h2>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              aria-label="Close"
-              onClick={() => setOpen(false)}
-            >
-              <X className="size-3.5" />
-            </Button>
+            <div className="flex items-center gap-1">
+              {showReset ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label="Reset conversation"
+                  disabled={resetThread.isPending || ask.isPending}
+                  onClick={() => void onReset()}
+                >
+                  <RotateCcw className="size-3.5" />
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Close"
+                onClick={closePanel}
+              >
+                <X className="size-3.5" />
+              </Button>
+            </div>
           </div>
 
           {!user ? (
@@ -244,7 +301,7 @@ export function AssistantChat({ className }: { className?: string }) {
                           type="button"
                           className="rounded-lg border border-zinc-200 px-3 py-2 text-left text-xs text-zinc-700 transition-colors hover:border-teal-300 hover:bg-teal-50/60 dark:border-zinc-800 dark:text-zinc-300 dark:hover:border-teal-800 dark:hover:bg-teal-950/40"
                           onClick={() => void send(example)}
-                          disabled={ask.isPending}
+                          disabled={ask.isPending || resetThread.isPending}
                         >
                           {example}
                         </button>
@@ -295,7 +352,7 @@ export function AssistantChat({ className }: { className?: string }) {
                     placeholder="Ask about tasks or events…"
                     rows={2}
                     className="min-h-16 max-h-32 resize-none text-sm"
-                    disabled={ask.isPending}
+                    disabled={ask.isPending || resetThread.isPending}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
@@ -306,7 +363,9 @@ export function AssistantChat({ className }: { className?: string }) {
                   <Button
                     type="submit"
                     size="sm"
-                    disabled={ask.isPending || !draft.trim()}
+                    disabled={
+                      ask.isPending || resetThread.isPending || !draft.trim()
+                    }
                   >
                     Send
                   </Button>
