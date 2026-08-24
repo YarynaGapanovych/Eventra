@@ -1,18 +1,27 @@
-import { Field, InputType, ObjectType } from '@nestjs/graphql';
-import { IsIn, IsString, MaxLength, MinLength } from 'class-validator';
+import { Field, ObjectType } from '@nestjs/graphql';
 
-@InputType()
-export class AssistantMessageInput {
+@ObjectType()
+export class AssistantMessage {
   @Field()
-  @IsString()
-  @IsIn(['user', 'assistant'])
+  id!: string;
+
+  @Field()
   role!: string;
 
   @Field()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(8000)
   content!: string;
+
+  @Field()
+  createdAt!: string;
+}
+
+@ObjectType()
+export class AssistantThread {
+  @Field(() => [AssistantMessage])
+  messages!: AssistantMessage[];
+
+  @Field(() => String, { nullable: true })
+  expiresAt!: string | null;
 }
 
 @ObjectType()

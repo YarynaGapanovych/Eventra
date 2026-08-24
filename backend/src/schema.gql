@@ -2,14 +2,21 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
-input AssistantMessageInput {
+type AssistantMessage {
   content: String!
+  createdAt: String!
+  id: String!
   role: String!
 }
 
 type AssistantReply {
   content: String!
   didMutate: Boolean!
+}
+
+type AssistantThread {
+  expiresAt: String
+  messages: [AssistantMessage!]!
 }
 
 type AuthPayload {
@@ -157,7 +164,7 @@ input LoginInput {
 }
 
 type Mutation {
-  askAssistant(messages: [AssistantMessageInput!]!): AssistantReply!
+  askAssistant(content: String!): AssistantReply!
   completeGoogleLogin(code: String!): AuthPayload!
   createEvent(input: CreateEventInput!): Event!
   createTask(input: CreateTaskInput!): Task!
@@ -167,6 +174,7 @@ type Mutation {
   login(input: LoginInput!): AuthPayload!
   register(input: RegisterInput!): AuthPayload!
   requestPasswordReset(input: RequestPasswordResetInput!): Boolean!
+  resetAssistantThread: Boolean!
   resetPassword(input: ResetPasswordInput!): Boolean!
   scheduleTask(input: ScheduleTaskInput!): Event!
   startGoogleCalendarConnect(input: StartGoogleCalendarConnectInput): GoogleCalendarConnectPayload!
@@ -178,6 +186,7 @@ type Mutation {
 }
 
 type Query {
+  assistantThread: AssistantThread!
   events: [Event!]!
   googleCalendarStatus: GoogleCalendarStatus!
   me: AuthUser!
