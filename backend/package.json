@@ -1,6 +1,7 @@
 {
   "name": "eventra-backend",
   "private": true,
+  "packageManager": "pnpm@11.22.0",
   "scripts": {
     "prebuild": "prisma generate",
     "predev": "prisma generate",
