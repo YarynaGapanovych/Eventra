@@ -1,27 +1,14 @@
 "use client";
 
+import { appNavItems, isAppNavActive } from "@/components/app-nav-items";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import {
-  BarChart3,
-  CalendarDays,
-  ChevronLeft,
-  ChevronRight,
-  ClipboardList,
-  Settings,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLayoutEffect, useState } from "react";
 
 const STORAGE_KEY = "eventra.sidebar.collapsed.v1";
-
-const navItems = [
-  { href: "/calendar", label: "Calendar", Icon: CalendarDays },
-  { href: "/tasks", label: "Tasks", Icon: ClipboardList },
-  { href: "/analytics", label: "Analytics", Icon: BarChart3 },
-  { href: "/settings", label: "Settings", Icon: Settings },
-] as const;
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -54,7 +41,7 @@ export function AppSidebar() {
   return (
     <aside
       className={cn(
-        "flex min-h-0 flex-col overflow-hidden border-r border-zinc-200/80 bg-white/92 backdrop-blur-md transition-[width] duration-200 ease-out dark:border-zinc-800 dark:bg-zinc-950/92",
+        "hidden min-h-0 flex-col overflow-hidden border-r border-zinc-200/80 bg-white/92 backdrop-blur-md transition-[width] duration-200 ease-out md:flex dark:border-zinc-800 dark:bg-zinc-950/92",
         rail ? "w-16" : "w-56 sm:w-60",
       )}
       aria-label="Main navigation"
@@ -65,8 +52,8 @@ export function AppSidebar() {
           className="flex flex-col gap-0.5"
           aria-label="App sections"
         >
-          {navItems.map(({ href, label, Icon }) => {
-            const active = pathname === href || pathname.startsWith(`${href}/`);
+          {appNavItems.map(({ href, label, Icon }) => {
+            const active = isAppNavActive(pathname, href);
             return (
               <Link
                 key={href}
