@@ -63,7 +63,7 @@ export function ResetPasswordForm({
 
   if (submitted) {
     return (
-      <div className="mx-auto flex h-full w-full max-w-2xl flex-col justify-center gap-7">
+      <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center gap-7">
         <header className="space-y-3">
           <h2 className="text-4xl font-semibold tracking-tight text-zinc-900 md:text-5xl dark:text-zinc-50">
             Password updated
@@ -89,7 +89,7 @@ export function ResetPasswordForm({
 
   return (
     <form
-      className="mx-auto flex h-full w-full max-w-2xl flex-col justify-center gap-7"
+      className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center gap-7"
       onSubmit={(e) => void handleSubmit(onValid)(e)}
     >
       <header className="space-y-3">

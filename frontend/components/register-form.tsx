@@ -65,11 +65,11 @@ export function RegisterForm({ onSuccess, onRequestLogin }: RegisterFormProps) {
 
   return (
     <form
-      className="mx-auto flex h-full w-full max-w-2xl flex-col justify-center gap-4"
+      className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center gap-4"
       onSubmit={(e) => void handleSubmit(onValid)(e)}
     >
-      <header className="space-y-3">
-        <h2 className="text-4xl font-semibold tracking-tight text-zinc-900 md:text-5xl dark:text-zinc-50">
+      <header className="space-y-2">
+        <h2 className="text-3xl font-semibold tracking-tight text-zinc-900 md:text-4xl dark:text-zinc-50">
           Create your account
         </h2>
         <p className="text-zinc-600 dark:text-zinc-400">
@@ -77,10 +77,10 @@ export function RegisterForm({ onSuccess, onRequestLogin }: RegisterFormProps) {
         </p>
       </header>
 
-      <div className="space-y-2.5">
+      <div className="space-y-2">
         <Label
           htmlFor="reg-name"
-          className="text-lg font-medium text-zinc-900 dark:text-zinc-100"
+          className="text-sm font-medium text-zinc-900 dark:text-zinc-100"
         >
           Full name
         </Label>
@@ -89,15 +89,15 @@ export function RegisterForm({ onSuccess, onRequestLogin }: RegisterFormProps) {
           type="text"
           autoComplete="name"
           placeholder="Enter your name"
-          className="h-14 rounded-xl border-zinc-300 bg-white px-4 text-lg shadow-sm transition-all focus-visible:ring-4 focus-visible:ring-teal-500/15 dark:border-zinc-700 dark:bg-zinc-900"
+          className="h-12 rounded-xl border-zinc-300 bg-white px-4 text-base shadow-sm transition-all focus-visible:ring-4 focus-visible:ring-teal-500/15 dark:border-zinc-700 dark:bg-zinc-900"
           {...register("name")}
         />
       </div>
 
-      <div className="space-y-2.5">
+      <div className="space-y-2">
         <Label
           htmlFor="reg-email"
-          className="text-lg font-medium text-zinc-900 dark:text-zinc-100"
+          className="text-sm font-medium text-zinc-900 dark:text-zinc-100"
         >
           Email address
         </Label>
@@ -107,7 +107,7 @@ export function RegisterForm({ onSuccess, onRequestLogin }: RegisterFormProps) {
           autoComplete="email"
           aria-invalid={!!formState.errors.email}
           placeholder="you@company.com"
-          className="h-14 rounded-xl border-zinc-300 bg-white px-4 text-lg shadow-sm transition-all focus-visible:ring-4 focus-visible:ring-teal-500/15 dark:border-zinc-700 dark:bg-zinc-900"
+          className="h-12 rounded-xl border-zinc-300 bg-white px-4 text-base shadow-sm transition-all focus-visible:ring-4 focus-visible:ring-teal-500/15 dark:border-zinc-700 dark:bg-zinc-900"
           {...register("email")}
         />
         {formState.errors.email ? (
@@ -117,10 +117,10 @@ export function RegisterForm({ onSuccess, onRequestLogin }: RegisterFormProps) {
         ) : null}
       </div>
 
-      <div className="space-y-2.5">
+      <div className="space-y-2">
         <Label
           htmlFor="reg-password"
-          className="text-lg font-medium text-zinc-900 dark:text-zinc-100"
+          className="text-sm font-medium text-zinc-900 dark:text-zinc-100"
         >
           Password
         </Label>
@@ -130,7 +130,7 @@ export function RegisterForm({ onSuccess, onRequestLogin }: RegisterFormProps) {
           autoComplete="new-password"
           aria-invalid={!!formState.errors.password}
           placeholder="Create a password"
-          className="h-14 rounded-xl border-zinc-300 bg-white px-4 text-lg shadow-sm transition-all focus-visible:ring-4 focus-visible:ring-teal-500/15 dark:border-zinc-700 dark:bg-zinc-900"
+          className="h-12 rounded-xl border-zinc-300 bg-white px-4 text-base shadow-sm transition-all focus-visible:ring-4 focus-visible:ring-teal-500/15 dark:border-zinc-700 dark:bg-zinc-900"
           {...register("password")}
         />
         {!formState.errors.password ? (
@@ -145,10 +145,10 @@ export function RegisterForm({ onSuccess, onRequestLogin }: RegisterFormProps) {
         ) : null}
       </div>
 
-      <div className="space-y-2.5">
+      <div className="space-y-2">
         <Label
           htmlFor="auth-confirm"
-          className="text-lg font-medium text-zinc-900 dark:text-zinc-100"
+          className="text-sm font-medium text-zinc-900 dark:text-zinc-100"
         >
           Confirm password
         </Label>
@@ -158,7 +158,7 @@ export function RegisterForm({ onSuccess, onRequestLogin }: RegisterFormProps) {
           autoComplete="new-password"
           aria-invalid={!!formState.errors.confirm}
           placeholder="Confirm your password"
-          className="h-14 rounded-xl border-zinc-300 bg-white px-4 text-lg shadow-sm transition-all focus-visible:ring-4 focus-visible:ring-teal-500/15 dark:border-zinc-700 dark:bg-zinc-900"
+          className="h-12 rounded-xl border-zinc-300 bg-white px-4 text-base shadow-sm transition-all focus-visible:ring-4 focus-visible:ring-teal-500/15 dark:border-zinc-700 dark:bg-zinc-900"
           {...register("confirm")}
         />
         {formState.errors.confirm ? (
@@ -176,7 +176,7 @@ export function RegisterForm({ onSuccess, onRequestLogin }: RegisterFormProps) {
 
       <Button
         type="submit"
-        className="h-14 w-full rounded-xl mt-4 bg-teal-700 text-lg font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-teal-800 hover:shadow-md dark:bg-teal-600 dark:hover:bg-teal-500"
+        className="h-12 w-full rounded-xl bg-teal-700 text-base font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-teal-800 hover:shadow-md dark:bg-teal-600 dark:hover:bg-teal-500"
         disabled={registerMutation.isPending}
       >
         {registerMutation.isPending ? (
@@ -189,7 +189,7 @@ export function RegisterForm({ onSuccess, onRequestLogin }: RegisterFormProps) {
         )}
       </Button>
 
-      <div className="py-4">
+      <div className="pt-2">
         <div className="flex items-center gap-3 text-sm uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
           <span className="h-px flex-1 bg-zinc-300 dark:bg-zinc-700" />
           Or continue with
@@ -201,7 +201,7 @@ export function RegisterForm({ onSuccess, onRequestLogin }: RegisterFormProps) {
         <Button
           type="button"
           variant="outline"
-          className="h-13 w-full rounded-xl border-zinc-300 bg-white text-lg text-zinc-800 shadow-sm hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+          className="h-12 w-full rounded-xl border-zinc-300 bg-white text-base text-zinc-800 shadow-sm hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
           onClick={() => startGoogleLogin()}
         >
           <Image src="/icons8-google.svg" alt="Google" width={18} height={18} />
@@ -209,8 +209,8 @@ export function RegisterForm({ onSuccess, onRequestLogin }: RegisterFormProps) {
         </Button>
       </div>
 
-      <div className="space-y-5 pt-2">
-        <p className="text-center text-base text-zinc-600 dark:text-zinc-400">
+      <div className="space-y-3 pt-1">
+        <p className="text-center text-sm text-zinc-600 dark:text-zinc-400">
           Already have an account?{" "}
           <Button
             type="button"

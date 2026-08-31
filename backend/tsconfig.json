@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
+    "module": "nodenext",
     "declaration": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,
@@ -19,7 +19,7 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "strict": true,
-    "moduleResolution": "node",
+    "moduleResolution": "nodenext",
     "rootDir": "./src"
   },
   "include": ["src/**/*.ts"],

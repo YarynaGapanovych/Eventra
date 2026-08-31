@@ -9,6 +9,10 @@ import {
 import { ConfigService } from '@nestjs/config';
 import type { Response } from 'express';
 import { AuthService } from './auth.service';
+import {
+  defaultFrontendOrigin,
+  validateFrontendRedirectUri,
+} from './frontend-redirect';
 
 type GoogleTokenResponse = {
   access_token?: string;
@@ -46,13 +50,15 @@ export class GoogleAuthController {
       throw new BadRequestException('redirect_uri is required');
     }
 
+    const safeRedirect = validateFrontendRedirectUri(redirectUri.trim());
+
     const port = this.config.get<string>('PORT') ?? '3001';
     const callbackUri =
       this.config.get<string>('GOOGLE_AUTH_REDIRECT_URI') ??
       `http://localhost:${port}/auth/google/callback`;
 
     const state = Buffer.from(
-      JSON.stringify({ redirectUri: redirectUri.trim() }),
+      JSON.stringify({ redirectUri: safeRedirect }),
     ).toString('base64url');
 
     const params = new URLSearchParams({
@@ -78,13 +84,24 @@ export class GoogleAuthController {
     @Query('error_description') errorDescription: string | undefined,
     @Res() res: Response,
   ): Promise<void> {
-    let redirectUri = 'http://localhost:3000/auth/google/callback';
+    const fallbackRedirect = `${defaultFrontendOrigin()}/auth/google/callback`;
+    let redirectUri = fallbackRedirect;
     try {
       const parsed = JSON.parse(
         Buffer.from(state, 'base64url').toString('utf8'),
       ) as { redirectUri?: string };
       if (parsed.redirectUri?.trim()) {
-        redirectUri = parsed.redirectUri.trim();
+        try {
+          redirectUri = validateFrontendRedirectUri(
+            parsed.redirectUri.trim(),
+          );
+        } catch {
+          const url = new URL(fallbackRedirect);
+          url.searchParams.set('google_auth', 'error');
+          url.searchParams.set('message', 'redirect_uri origin is not allowed');
+          res.redirect(url.toString());
+          return;
+        }
       }
     } catch {
       /* use default */

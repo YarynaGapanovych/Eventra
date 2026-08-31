@@ -7,8 +7,8 @@ type AuthSplitLayoutProps = {
 
 export function AuthSplitLayout({ children }: AuthSplitLayoutProps) {
   return (
-    <main className="grid h-screen w-full md:grid-cols-2 md:items-stretch">
-      <div className="relative overflow-hidden bg-black pl-16 pr-8 pt-12 pb-14 text-left md:pl-12 md:pr-8 md:pt-14 md:pb-16 lg:pl-16 lg:pr-12 lg:pt-16 lg:pb-18">
+    <main className="grid min-h-dvh w-full md:h-dvh md:grid-cols-2 md:overflow-hidden">
+      <div className="relative flex min-h-[40vh] flex-col overflow-hidden bg-black px-10 py-10 text-left md:h-full md:min-h-0 md:px-12 md:py-12 lg:px-16 lg:py-14">
         <div className="pointer-events-none absolute -left-12 top-8 h-72 w-72 rounded-full border border-teal-700/35" />
         <div className="pointer-events-none absolute -right-30 top-28 h-132 w-132 rounded-full border border-teal-700/30" />
         <div className="pointer-events-none absolute -right-20 -bottom-28 h-96 w-96 rounded-full border border-teal-700/24" />
@@ -19,41 +19,41 @@ export function AuthSplitLayout({ children }: AuthSplitLayoutProps) {
         <div className="pointer-events-none absolute -right-8 bottom-44 h-64 w-64 rounded-full border border-teal-700/24" />
         <div className="pointer-events-none absolute right-32 -bottom-8 h-44 w-44 rounded-full border border-teal-500/20" />
 
-        <div className="relative z-10">
-          <p className="text-3xl font-semibold leading-none uppercase tracking-[0.08em] text-teal-600 md:text-4xl lg:text-5xl">
+        <div className="relative z-10 flex flex-1 flex-col justify-between gap-8">
+          <p className="text-3xl font-semibold leading-none uppercase tracking-[0.08em] text-teal-600 md:text-4xl">
             Eventra
           </p>
-          <div className="mt-[28%] flex flex-col gap-14">
-            <h1 className=" text-5xl font-semibold leading-[0.95] tracking-tight text-balance text-zinc-100  md:text-6xl  lg:text-7xl">
+          <div className="flex flex-col gap-6 md:gap-8">
+            <h1 className="text-4xl font-semibold leading-[0.95] tracking-tight text-balance text-zinc-100 md:text-5xl">
               Schedule work together
             </h1>
-            <p className="text-lg leading-relaxed text-zinc-400  md:text-xl lg:text-2xl">
+            <p className="text-base leading-relaxed text-zinc-400 md:text-lg">
               Coordinate seamlessly with your team. Manage calendars, tasks, and
               meetings in one unified workspace.
             </p>
 
-            <ul className=" space-y-4   lg:space-y-5">
-              <li className="flex items-center gap-4 lg:gap-5">
-                <span className="inline-flex size-12 items-center justify-center rounded-2xl border border-teal-900/45 bg-teal-950/25 text-teal-600 lg:size-14">
-                  <CalendarDays className="size-6 lg:size-7" aria-hidden />
+            <ul className="space-y-3 md:space-y-4">
+              <li className="flex items-center gap-3 md:gap-4">
+                <span className="inline-flex size-10 items-center justify-center rounded-2xl border border-teal-900/45 bg-teal-950/25 text-teal-600 md:size-11">
+                  <CalendarDays className="size-5 md:size-6" aria-hidden />
                 </span>
-                <span className="text-lg leading-tight text-zinc-300 md:text-xl lg:text-2xl">
+                <span className="text-base leading-tight text-zinc-300 md:text-lg">
                   Smart calendar scheduling
                 </span>
               </li>
-              <li className="flex items-center gap-4 lg:gap-5">
-                <span className="inline-flex size-12 items-center justify-center rounded-2xl border border-teal-900/45 bg-teal-950/25 text-teal-600 lg:size-14">
-                  <Users className="size-6 lg:size-7" aria-hidden />
+              <li className="flex items-center gap-3 md:gap-4">
+                <span className="inline-flex size-10 items-center justify-center rounded-2xl border border-teal-900/45 bg-teal-950/25 text-teal-600 md:size-11">
+                  <Users className="size-5 md:size-6" aria-hidden />
                 </span>
-                <span className="text-lg leading-tight text-zinc-300 md:text-xl lg:text-2xl">
+                <span className="text-base leading-tight text-zinc-300 md:text-lg">
                   Team collaboration tools
                 </span>
               </li>
-              <li className="flex items-center gap-4 lg:gap-5">
-                <span className="inline-flex size-12 items-center justify-center rounded-2xl border border-teal-900/45 bg-teal-950/25 text-teal-600 lg:size-14">
-                  <Clock3 className="size-6 lg:size-7" aria-hidden />
+              <li className="flex items-center gap-3 md:gap-4">
+                <span className="inline-flex size-10 items-center justify-center rounded-2xl border border-teal-900/45 bg-teal-950/25 text-teal-600 md:size-11">
+                  <Clock3 className="size-5 md:size-6" aria-hidden />
                 </span>
-                <span className="text-lg leading-tight text-zinc-300 md:text-xl lg:text-2xl">
+                <span className="text-base leading-tight text-zinc-300 md:text-lg">
                   Real-time availability sync
                 </span>
               </li>
@@ -62,7 +62,7 @@ export function AuthSplitLayout({ children }: AuthSplitLayoutProps) {
         </div>
       </div>
 
-      <div className="relative overflow-hidden  bg-zinc-50/95 p-7 dark:bg-zinc-950/85">
+      <div className="relative min-h-0 overflow-y-auto bg-zinc-50/95 p-7 dark:bg-zinc-950/85">
         {children}
       </div>
     </main>
