@@ -20,7 +20,6 @@
     "resolveJsonModule": true,
     "strict": true,
     "moduleResolution": "nodenext",
-    "ignoreDeprecations": "6.0",
     "rootDir": "./src"
   },
   "include": ["src/**/*.ts"],
