@@ -53,22 +53,22 @@ export function LoginForm({
 
   return (
     <form
-      className="mx-auto flex h-full w-full max-w-2xl flex-col justify-center gap-7"
+      className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center gap-5"
       onSubmit={(e) => void handleSubmit(onValid)(e)}
     >
-      <header className="space-y-3">
-        <h2 className="text-4xl font-semibold tracking-tight text-zinc-900 md:text-5xl dark:text-zinc-50">
+      <header className="space-y-2">
+        <h2 className="text-3xl font-semibold tracking-tight text-zinc-900 md:text-4xl dark:text-zinc-50">
           Welcome back
         </h2>
-        <p className="text-lg leading-relaxed text-zinc-600 dark:text-zinc-400">
+        <p className="text-base leading-relaxed text-zinc-600 dark:text-zinc-400">
           Sign in to manage your schedule and team calendar.
         </p>
       </header>
 
-      <div className="space-y-2.5">
+      <div className="space-y-2">
         <Label
           htmlFor="auth-email"
-          className="text-lg font-medium text-zinc-900 dark:text-zinc-100"
+          className="text-sm font-medium text-zinc-900 dark:text-zinc-100"
         >
           Email address
         </Label>
@@ -78,7 +78,7 @@ export function LoginForm({
           autoComplete="email"
           aria-invalid={!!formState.errors.email}
           placeholder="you@company.com"
-          className="h-14 rounded-xl border-zinc-300 bg-white px-4 text-lg shadow-sm transition-all focus-visible:ring-4 focus-visible:ring-teal-500/15 dark:border-zinc-700 dark:bg-zinc-900"
+          className="h-12 rounded-xl border-zinc-300 bg-white px-4 text-base shadow-sm transition-all focus-visible:ring-4 focus-visible:ring-teal-500/15 dark:border-zinc-700 dark:bg-zinc-900"
           {...register("email")}
         />
         {formState.errors.email ? (
@@ -88,11 +88,11 @@ export function LoginForm({
         ) : null}
       </div>
 
-      <div className="space-y-2.5">
+      <div className="space-y-2">
         <div className="flex items-center justify-between gap-3">
           <Label
             htmlFor="auth-password"
-            className="text-lg font-medium text-zinc-900 dark:text-zinc-100"
+            className="text-sm font-medium text-zinc-900 dark:text-zinc-100"
           >
             Password
           </Label>
@@ -114,7 +114,7 @@ export function LoginForm({
           autoComplete="current-password"
           aria-invalid={!!formState.errors.password}
           placeholder="Enter your password"
-          className="h-14 rounded-xl border-zinc-300 bg-white px-4 text-lg shadow-sm transition-all focus-visible:ring-4 focus-visible:ring-teal-500/15 dark:border-zinc-700 dark:bg-zinc-900"
+          className="h-12 rounded-xl border-zinc-300 bg-white px-4 text-base shadow-sm transition-all focus-visible:ring-4 focus-visible:ring-teal-500/15 dark:border-zinc-700 dark:bg-zinc-900"
           {...register("password")}
         />
         {formState.errors.password ? (
@@ -132,7 +132,7 @@ export function LoginForm({
 
       <Button
         type="submit"
-        className="h-14 w-full rounded-xl bg-teal-700 text-lg font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-teal-800 hover:shadow-md dark:bg-teal-600 dark:hover:bg-teal-500"
+        className="h-12 w-full rounded-xl bg-teal-700 text-base font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-teal-800 hover:shadow-md dark:bg-teal-600 dark:hover:bg-teal-500"
         disabled={login.isPending}
       >
         {login.isPending ? (
@@ -157,7 +157,7 @@ export function LoginForm({
         <Button
           type="button"
           variant="outline"
-          className="h-13 w-full rounded-xl border-zinc-300 bg-white text-lg text-zinc-800 shadow-sm hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+          className="h-12 w-full rounded-xl border-zinc-300 bg-white text-base text-zinc-800 shadow-sm hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
           onClick={() => startGoogleLogin()}
         >
           <Image src="/icons8-google.svg" alt="Google" width={18} height={18} />
@@ -165,8 +165,8 @@ export function LoginForm({
         </Button>
       </div>
 
-      <div className="space-y-5 pt-2">
-        <p className="text-center text-base text-zinc-600 dark:text-zinc-400">
+      <div className="space-y-3 pt-1">
+        <p className="text-center text-sm text-zinc-600 dark:text-zinc-400">
           Don&apos;t have an account?{" "}
           <Button
             type="button"
