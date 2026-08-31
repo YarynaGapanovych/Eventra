@@ -43,11 +43,24 @@ import {
   type Task,
 } from "pull-plan-calendar";
 import "pull-plan-calendar/dist/calendar.css";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
+import { createPortal } from "react-dom";
 
 const calendarNavIconClass = "size-4 shrink-0";
 const CALENDAR_VIEW_STORAGE_KEY = "eventra.calendar.view.v1";
 const UNSCHEDULED_PREFIX = "task:";
+const UNSCHEDULED_TITLE = "Add task to calendar";
+const UNSCHEDULED_HINT =
+  "Drag a task onto the calendar to schedule it, or double-click to view.";
 const CALENDAR_VIEWS: readonly CalendarViewMode[] = [
   "day",
   "week",
@@ -77,11 +90,186 @@ function writeStoredCalendarView(view: CalendarViewMode): void {
   }
 }
 
+const DAY_WEEK_ADD_EVENT_CSS = `
+[data-slot="day-view"] [data-slot="unscheduled-list"] > [aria-label="Add event"],
+[data-slot="week-view"] [data-slot="unscheduled-list"] > [aria-label="Add event"],
+[data-slot="day-view"] [data-slot="unscheduled-list"] > [data-slot="calendar-add-event"],
+[data-slot="week-view"] [data-slot="unscheduled-list"] > [data-slot="calendar-add-event"],
+[data-slot="month-view-nav"] [data-slot="calendar-add-event"],
+[data-slot="year-view-nav"] [data-slot="calendar-add-event"] {
+  display: none;
+}
+.eventra-calendar-shell {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+.eventra-calendar-shell > [data-slot="calendar-add-event"] {
+  grid-column: 1;
+  grid-row: 1;
+  z-index: 2;
+  margin: 1.5rem 0.75rem 1.5rem 0;
+}
+.eventra-calendar-shell [data-slot="calendar-root"] {
+  display: contents;
+}
+.eventra-calendar-shell [data-slot="calendar-view-switcher"] {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  justify-content: flex-end;
+  margin: 1.5rem 0;
+}
+.eventra-calendar-shell [data-slot="calendar-content"] {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+[data-slot="week-day-add-event"] {
+  padding: 0.25rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #d18f60;
+  line-height: 1;
+}
+[data-slot="week-day-add-event"]:hover {
+  color: #b1724b;
+}
+`.trim();
+
 function CalendarAddEventButton({ onClick }: { onClick: () => void }) {
   return (
-    <Button type="button" size="icon" onClick={onClick} aria-label="Add event">
+    <Button
+      type="button"
+      size="sm"
+      data-slot="calendar-add-event"
+      onClick={onClick}
+      aria-label="Add event"
+      className="relative z-10 shrink-0 bg-zinc-900 text-zinc-50 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+    >
       <CalendarPlus className="size-4" aria-hidden />
+      <span className="hidden md:inline">Add Event</span>
     </Button>
+  );
+}
+
+function WeekDayAddButton({
+  date,
+  onClick,
+}: {
+  date: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      data-slot="week-day-add-event"
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
+      aria-label={date ? `Add event on ${date}` : "Add event"}
+    >
+      +
+    </button>
+  );
+}
+
+function sameElements(a: Element[], b: Element[]): boolean {
+  return a.length === b.length && a.every((el, i) => el === b[i]);
+}
+
+function applyUnscheduledCopy(root: HTMLElement | null) {
+  if (!root) return;
+
+  const title = root.querySelector('[data-slot="unscheduled-title"]');
+  if (title instanceof HTMLElement && title.textContent !== UNSCHEDULED_TITLE) {
+    title.textContent = UNSCHEDULED_TITLE;
+  }
+
+  const list = root.querySelector('[data-slot="unscheduled-list"]');
+  if (!(list instanceof HTMLElement)) return;
+
+  const hasItems =
+    list.querySelector('[data-slot="unscheduled-event"]') != null;
+  const hint = list.querySelector('[data-slot="unscheduled-hint"]');
+
+  if (!hasItems) {
+    if (hint) hint.remove();
+    return;
+  }
+
+  if (hint instanceof HTMLElement) {
+    if (hint.textContent !== UNSCHEDULED_HINT) {
+      hint.textContent = UNSCHEDULED_HINT;
+    }
+    return;
+  }
+
+  const inserted = document.createElement("p");
+  inserted.setAttribute("data-slot", "unscheduled-hint");
+  inserted.textContent = UNSCHEDULED_HINT;
+  list.appendChild(inserted);
+}
+
+function openLibraryCreateEvent(root: HTMLElement | null) {
+  const button = root?.querySelector(
+    '[data-slot="unscheduled-list"] [aria-label="Add event"], [data-slot="month-view-nav"] [data-slot="calendar-add-event"], [data-slot="year-view-nav"] [data-slot="calendar-add-event"]',
+  );
+  if (button instanceof HTMLElement) button.click();
+}
+
+function CalendarAddEventOverlays({
+  rootRef,
+  view,
+  calendarKey,
+}: {
+  rootRef: RefObject<HTMLDivElement | null>;
+  view: CalendarViewMode;
+  calendarKey: string;
+}) {
+  const [dayCells, setDayCells] = useState<Element[]>([]);
+
+  const syncHosts = useCallback(() => {
+    const root = rootRef.current;
+    applyUnscheduledCopy(root);
+    if (!root || view !== "week") {
+      setDayCells((prev) => (prev.length === 0 ? prev : []));
+      return;
+    }
+    const cells = [...root.querySelectorAll('[data-slot="week-day-cell"]')];
+    setDayCells((prev) => (sameElements(prev, cells) ? prev : cells));
+  }, [rootRef, view]);
+
+  useLayoutEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- sync portals to library calendar DOM */
+    syncHosts();
+    const root = rootRef.current;
+    if (!root) return;
+    const observer = new MutationObserver(syncHosts);
+    observer.observe(root, { childList: true, subtree: true });
+    return () => observer.disconnect();
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [calendarKey, rootRef, syncHosts]);
+
+  return (
+    <>
+      {dayCells.map((cell, index) => {
+        const date = cell.getAttribute("data-date") ?? "";
+        return (
+          <Fragment key={date || String(index)}>
+            {createPortal(
+              <WeekDayAddButton
+                date={date}
+                onClick={() => openLibraryCreateEvent(rootRef.current)}
+              />,
+              cell,
+            )}
+          </Fragment>
+        );
+      })}
+    </>
   );
 }
 
@@ -361,6 +549,7 @@ function PullPlanCalendarView() {
 
       <div
         ref={calendarRootRef}
+        className="eventra-calendar-shell"
         onClick={(event) => {
           const target = event.target as HTMLElement | null;
           const option = target?.closest?.("[data-value]");
@@ -372,6 +561,15 @@ function PullPlanCalendarView() {
         }}
       >
       {eventColorsCss ? <style>{eventColorsCss}</style> : null}
+      <style>{DAY_WEEK_ADD_EVENT_CSS}</style>
+      <CalendarAddEventButton
+        onClick={() => openLibraryCreateEvent(calendarRootRef.current)}
+      />
+      <CalendarAddEventOverlays
+        rootRef={calendarRootRef}
+        view={view}
+        calendarKey={calendarKey}
+      />
       <Calendar
         key={calendarKey}
         showSwitcher={true}
