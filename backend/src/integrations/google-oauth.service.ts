@@ -26,9 +26,12 @@ export class GoogleOAuthService {
 
   getCalendarCallbackUri(): string {
     const port = this.config.get<string>('PORT') ?? '3001';
+    // Use the sign-in callback (already authorized in Google Console).
+    // Calendar vs login is distinguished by OAuth `state`, not by path.
     return (
-      this.config.get<string>('GOOGLE_CALENDAR_REDIRECT_URI') ??
-      `http://localhost:${port}/integrations/google-calendar/callback`
+      this.config.get<string>('GOOGLE_AUTH_REDIRECT_URI')?.trim() ||
+      this.config.get<string>('GOOGLE_CALENDAR_REDIRECT_URI')?.trim() ||
+      `http://localhost:${port}/auth/google/callback`
     );
   }
 

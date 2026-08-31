@@ -65,7 +65,7 @@ export function RegisterForm({ onSuccess, onRequestLogin }: RegisterFormProps) {
 
   return (
     <form
-      className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center gap-4"
+      className="mx-auto flex w-full max-w-2xl flex-col gap-4"
       onSubmit={(e) => void handleSubmit(onValid)(e)}
     >
       <header className="space-y-2">

@@ -26,8 +26,21 @@ async function bootstrap() {
     }),
   );
   const port = Number(process.env.PORT ?? 3001);
-  await app.listen(port);
-  console.log(`API listening on http://localhost:${port}`);
+  try {
+    await app.listen(port);
+    console.log(`API listening on http://localhost:${port}`);
+  } catch (err) {
+    const code =
+      err instanceof Error && 'code' in err
+        ? (err as NodeJS.ErrnoException).code
+        : undefined;
+    if (code === 'EADDRINUSE') {
+      throw new Error(
+        `Port ${port} is already in use. Stop the other process using that port, then restart the API.`,
+      );
+    }
+    throw err;
+  }
 }
 
 void bootstrap();

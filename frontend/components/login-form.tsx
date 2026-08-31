@@ -53,7 +53,7 @@ export function LoginForm({
 
   return (
     <form
-      className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center gap-5"
+      className="mx-auto flex w-full max-w-2xl flex-col gap-5"
       onSubmit={(e) => void handleSubmit(onValid)(e)}
     >
       <header className="space-y-2">

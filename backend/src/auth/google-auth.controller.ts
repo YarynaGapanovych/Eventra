@@ -7,6 +7,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import {
@@ -33,6 +34,7 @@ export class GoogleAuthController {
   constructor(
     private readonly config: ConfigService,
     private readonly authService: AuthService,
+    private readonly jwtService: JwtService,
   ) {}
 
   @Get('connect')
@@ -84,6 +86,16 @@ export class GoogleAuthController {
     @Query('error_description') errorDescription: string | undefined,
     @Res() res: Response,
   ): Promise<void> {
+    if (this.isCalendarOAuthState(state)) {
+      const params = new URLSearchParams();
+      if (state) params.set('state', state);
+      if (code) params.set('code', code);
+      if (error) params.set('error', error);
+      if (errorDescription) params.set('error_description', errorDescription);
+      res.redirect(`/integrations/google-calendar/callback?${params.toString()}`);
+      return;
+    }
+
     const fallbackRedirect = `${defaultFrontendOrigin()}/auth/google/callback`;
     let redirectUri = fallbackRedirect;
     try {
@@ -146,6 +158,16 @@ export class GoogleAuthController {
         err instanceof Error ? err.message : 'google_sign_in_failed',
       );
       res.redirect(url.toString());
+    }
+  }
+
+  private isCalendarOAuthState(state: string | undefined): boolean {
+    if (!state?.trim()) return false;
+    try {
+      const payload = this.jwtService.verify<{ purpose?: string }>(state);
+      return payload.purpose === 'calendar_oauth_state';
+    } catch {
+      return false;
     }
   }
 

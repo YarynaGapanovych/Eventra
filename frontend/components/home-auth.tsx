@@ -1,6 +1,5 @@
 "use client";
 
-import { APP_AUTH_GATE_DISABLED } from "@/components/app-auth-gate";
 import { AuthSplitLayout } from "@/components/auth-split-layout";
 import { ForgotPasswordForm } from "@/components/forgot-password-form";
 import { LoginForm } from "@/components/login-form";
@@ -26,7 +25,6 @@ function HomeAuthContent() {
   const token = useAuthStore((s) => s.token);
 
   useEffect(() => {
-    if (APP_AUTH_GATE_DISABLED) return;
     if (!hydrated) return;
     if (token) void goApp();
   }, [goApp, hydrated, token]);
