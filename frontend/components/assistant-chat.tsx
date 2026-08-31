@@ -242,7 +242,7 @@ export function AssistantChat({ className }: { className?: string }) {
       {open ? (
         <div
           ref={panelRef}
-          className="absolute right-0 top-full z-[60] mt-2 flex w-[min(calc(100vw-2rem),24rem)] max-h-[min(75vh,36rem)] flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-950"
+          className="fixed inset-x-3 top-16 z-[60] flex w-auto max-h-[calc(100dvh-8.5rem-env(safe-area-inset-bottom))] flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xl md:absolute md:inset-x-auto md:right-0 md:top-full md:mt-2 md:w-[min(calc(100vw-2rem),24rem)] md:max-h-[min(75vh,36rem)] dark:border-zinc-800 dark:bg-zinc-950"
           role="dialog"
           aria-modal="false"
           aria-labelledby={titleId}
