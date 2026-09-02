@@ -2,6 +2,7 @@
 
 import { CalendarCreateEventModal } from "@/components/calendar-create-event-modal";
 import { CalendarEventDetailModal } from "@/components/calendar-event-detail-modal";
+import { OverlapConfirmDialog } from "@/components/overlap-confirm-dialog";
 import {
   EventCreateColorProvider,
   useEventCreateDraft,
@@ -24,6 +25,11 @@ import {
   useApiWakeNotice,
 } from "@/hooks/use-api-wake-notice";
 import { parseMasterEventId } from "@/lib/calendar-details";
+import {
+  findOverlappingEvents,
+  isOverlapConfirmCancelled,
+  OverlapConfirmCancelledError,
+} from "@/lib/event-overlap";
 import { type ApiEvent } from "@/lib/events-api";
 import {
   eventContrastText,
@@ -388,6 +394,11 @@ export function PullPlanCalendar() {
 function PullPlanCalendarView() {
   const [view, setView] = useState<CalendarViewMode>("day");
   const [actionError, setActionError] = useState<string | null>(null);
+  const [overlapPrompt, setOverlapPrompt] = useState<{
+    titles: string[];
+    confirmLabel: string;
+  } | null>(null);
+  const overlapResolverRef = useRef<((ok: boolean) => void) | null>(null);
   const calendarRootRef = useRef<HTMLDivElement>(null);
   const {
     data: tasks = [],
@@ -453,6 +464,37 @@ function PullPlanCalendarView() {
   }, [events, tasks]);
 
   const { getDraft, setDraft } = useEventCreateDraft();
+
+  function settleOverlapPrompt(ok: boolean) {
+    overlapResolverRef.current?.(ok);
+    overlapResolverRef.current = null;
+    setOverlapPrompt(null);
+  }
+
+  function confirmOverlapIfNeeded(options: {
+    start: Date;
+    end: Date;
+    excludeId?: string | null;
+    busy?: boolean;
+    confirmLabel: string;
+  }): Promise<void> {
+    if (options.busy === false) return Promise.resolve();
+    const overlapping = findOverlappingEvents(events, options, {
+      excludeId: options.excludeId,
+    });
+    if (overlapping.length === 0) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      overlapResolverRef.current = (ok) => {
+        if (ok) resolve();
+        else reject(new OverlapConfirmCancelledError());
+      };
+      setOverlapPrompt({
+        titles: overlapping.map((event) => event.title),
+        confirmLabel: options.confirmLabel,
+      });
+    });
+  }
+
   const calendarKey = `${events
     .map((e) => `${e.id}:${e.color ?? ""}`)
     .join(",")}|${tasks.map((t) => t.id).join(",")}`;
@@ -480,6 +522,12 @@ function PullPlanCalendarView() {
     setActionError(null);
     try {
       const draft = getDraft();
+      await confirmOverlapIfNeeded({
+        start: dayjs(payload.start).toDate(),
+        end: dayjs(payload.end).toDate(),
+        busy: draft.busy,
+        confirmLabel: "Create anyway",
+      });
       const created = await createEventMutation.mutateAsync({
         title: payload.title.trim() || "Untitled event",
         start: payload.start.toISOString(),
@@ -505,6 +553,7 @@ function PullPlanCalendarView() {
         reminders: [],
       });
     } catch (err) {
+      if (isOverlapConfirmCancelled(err)) throw err;
       const message =
         err instanceof Error ? err.message : "Could not create event.";
       setActionError(message);
@@ -528,6 +577,13 @@ function PullPlanCalendarView() {
     const taskId = unscheduledTaskId(payload.id);
     setActionError(null);
     try {
+      await confirmOverlapIfNeeded({
+        start: dayjs(payload.start).toDate(),
+        end: dayjs(payload.end).toDate(),
+        excludeId: taskId ? null : payload.id,
+        busy: matched?.busy ?? true,
+        confirmLabel: taskId ? "Schedule anyway" : "Save anyway",
+      });
       if (taskId) {
         await scheduleTaskMutation.mutateAsync({
           taskId,
@@ -544,6 +600,7 @@ function PullPlanCalendarView() {
         },
       });
     } catch (err) {
+      if (isOverlapConfirmCancelled(err)) throw err;
       const message =
         err instanceof Error ? err.message : "Could not update event.";
       setActionError(message);
@@ -622,6 +679,13 @@ function PullPlanCalendarView() {
         EventDetailModal={CalendarEventDetailModal}
       />
       </div>
+      <OverlapConfirmDialog
+        open={overlapPrompt !== null}
+        titles={overlapPrompt?.titles ?? []}
+        confirmLabel={overlapPrompt?.confirmLabel ?? "Create anyway"}
+        onCancel={() => settleOverlapPrompt(false)}
+        onConfirm={() => settleOverlapPrompt(true)}
+      />
       {calendarLoading ? (
         <div
           className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-white/75 px-6 text-center backdrop-blur-[2px] dark:bg-zinc-950/70"
