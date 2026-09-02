@@ -63,7 +63,7 @@ import {
   useState,
   type RefObject,
 } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { toast } from "sonner";
 
 const calendarNavIconClass = "size-4 shrink-0";
@@ -98,6 +98,32 @@ function writeStoredCalendarView(view: CalendarViewMode): void {
     window.localStorage.setItem(CALENDAR_VIEW_STORAGE_KEY, view);
   } catch {
     /* ignore */
+  }
+}
+
+const DAY_TITLE_FORMAT = "dddd, MMM D, YYYY";
+
+function dayViewNavTitle(root: HTMLElement): string | null {
+  const title = root.querySelector(
+    '[data-slot="day-view-nav"] [data-slot="title"]',
+  );
+  return title?.textContent?.trim() || null;
+}
+
+function revealTodayInDayView(root: HTMLElement): void {
+  const todayLabel = dayjs().format(DAY_TITLE_FORMAT);
+  if (dayViewNavTitle(root) === todayLabel) return;
+  const next = root.querySelector(
+    '[data-slot="day-view"] [aria-label="Next day"]',
+  );
+  if (!(next instanceof HTMLElement)) return;
+
+  const steps = dayjs().day();
+  for (let i = 0; i < steps; i++) {
+    if (dayViewNavTitle(root) === todayLabel) return;
+    flushSync(() => {
+      next.click();
+    });
   }
 }
 
@@ -498,25 +524,33 @@ function PullPlanCalendarView() {
   const calendarKey = `${events
     .map((e) => `${e.id}:${e.color ?? ""}`)
     .join(",")}|${tasks.map((t) => t.id).join(",")}`;
+  const calendarInstanceKey = `${calendarKey}|${view === "day" ? "day" : "range"}`;
   const eventColorsCss = useMemo(
     () => eventColorCss(scheduledEvents),
     [scheduledEvents],
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const root = calendarRootRef.current;
     if (!root) return;
     const selected = root.querySelector(
       '[data-slot="segmented-control-option"][aria-selected="true"]',
     );
     const current = selected?.getAttribute("data-value");
-    if (current === view) return;
-    const button = root.querySelector(
-      `[data-slot="segmented-control-option"][data-value="${view}"]`,
-    );
-    if (!(button instanceof HTMLElement)) return;
-    button.click();
-  }, [view, calendarKey]);
+    if (current !== view) {
+      const button = root.querySelector(
+        `[data-slot="segmented-control-option"][data-value="${view}"]`,
+      );
+      if (button instanceof HTMLElement) {
+        flushSync(() => {
+          button.click();
+        });
+      }
+    }
+    if (view === "day") {
+      revealTodayInDayView(root);
+    }
+  }, [view, calendarInstanceKey]);
 
   async function handleEventCreate(payload: CalendarEventCreatePayload) {
     setActionError(null);
@@ -632,10 +666,10 @@ function PullPlanCalendarView() {
       <CalendarAddEventOverlays
         rootRef={calendarRootRef}
         view={view}
-        calendarKey={calendarKey}
+        calendarKey={calendarInstanceKey}
       />
       <Calendar
-        key={calendarKey}
+        key={calendarInstanceKey}
         showSwitcher={true}
         views={["week", "year", "day", "month"]}
         defaultScheduledEvents={scheduledEvents}
