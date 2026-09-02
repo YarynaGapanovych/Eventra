@@ -8,6 +8,13 @@ export const UPDATE_GOOGLE_CALENDAR_SYNC_WINDOW_MUTATION = `
       lastSyncedAt
       syncDaysBack
       syncDaysForward
+      pendingOverlaps {
+        id
+        title
+        overlappingTitles
+        start
+        end
+      }
     }
   }
 `;

@@ -1,5 +1,6 @@
 import { graphqlRequest } from "@/lib/graphql";
 import {
+  ACKNOWLEDGE_GOOGLE_CALENDAR_OVERLAPS_MUTATION,
   DISCONNECT_GOOGLE_CALENDAR_MUTATION,
   START_GOOGLE_CALENDAR_CONNECT_MUTATION,
   SYNC_GOOGLE_CALENDAR_MUTATION,
@@ -83,6 +84,23 @@ export function useSyncGoogleCalendarMutation() {
       );
     },
     onSuccess: invalidate,
+  });
+}
+
+export function useAcknowledgeGoogleCalendarOverlapsMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const data = await graphqlRequest<{
+        acknowledgeGoogleCalendarOverlaps?: boolean;
+      }>(ACKNOWLEDGE_GOOGLE_CALENDAR_OVERLAPS_MUTATION);
+      return data.acknowledgeGoogleCalendarOverlaps === true;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.googleCalendarStatus,
+      });
+    },
   });
 }
 

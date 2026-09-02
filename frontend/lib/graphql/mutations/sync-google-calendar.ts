@@ -4,6 +4,13 @@ export const SYNC_GOOGLE_CALENDAR_MUTATION = `
       ok
       syncedAt
       imported
+      overlaps {
+        id
+        title
+        overlappingTitles
+        start
+        end
+      }
     }
   }
 `;

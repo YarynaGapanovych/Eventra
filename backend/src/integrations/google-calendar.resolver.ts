@@ -65,7 +65,19 @@ export class GoogleCalendarResolver {
     @CurrentUser() user: JwtUser,
   ): Promise<GoogleCalendarSyncPayload> {
     const result = await this.syncService.syncForUser(user.userId);
-    return { ok: true, syncedAt: result.syncedAt, imported: result.imported };
+    return {
+      ok: true,
+      syncedAt: result.syncedAt,
+      imported: result.imported,
+      overlaps: result.overlaps,
+    };
+  }
+
+  @Mutation(() => Boolean)
+  async acknowledgeGoogleCalendarOverlaps(
+    @CurrentUser() user: JwtUser,
+  ): Promise<boolean> {
+    return this.integrationService.acknowledgeOverlapNotices(user.userId);
   }
 
   @Mutation(() => GoogleCalendarStatus)

@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { findOverlappingEvents } from '../calendar/event-overlap';
 import {
   EventSource,
   EventVisibility,
@@ -12,6 +13,7 @@ import {
   resolveGoogleEventColor,
   toGoogleDisplayColor,
 } from './google-event-colors';
+import type { CalendarOverlapNotice } from './google-calendar.types';
 
 type GoogleCalendarEvent = {
   id?: string;
@@ -64,6 +66,7 @@ type GoogleColorContext = {
 export type GoogleCalendarSyncResult = {
   imported: number;
   syncedAt: string;
+  overlaps: CalendarOverlapNotice[];
 };
 
 @Injectable()
@@ -92,7 +95,21 @@ export class GoogleCalendarSyncService {
       this.fetchColorContext(accessToken),
     ]);
 
+    const existingGoogleRows = await this.prisma.event.findMany({
+      where: { userId, source: EventSource.google },
+      select: { googleEventId: true, start: true, end: true },
+    });
+    const existingTimes = new Map<string, { start: number; end: number }>();
+    for (const row of existingGoogleRows) {
+      if (!row.googleEventId) continue;
+      existingTimes.set(row.googleEventId, {
+        start: row.start.getTime(),
+        end: row.end.getTime(),
+      });
+    }
+
     const seenIds = new Set<string>();
+    const changedGoogleIds = new Set<string>();
     let imported = 0;
     for (const event of events) {
       if (!event.id || event.status === 'cancelled') continue;
@@ -101,6 +118,14 @@ export class GoogleCalendarSyncService {
 
       seenIds.add(event.id);
       const { guests, reminders, ...scalars } = mapped;
+      const previous = existingTimes.get(event.id);
+      const timesChanged =
+        !previous ||
+        previous.start !== scalars.start.getTime() ||
+        previous.end !== scalars.end.getTime();
+      if (timesChanged && scalars.busy !== false) {
+        changedGoogleIds.add(event.id);
+      }
       const row = await this.prisma.event.upsert({
         where: {
           userId_googleEventId: {
@@ -149,13 +174,64 @@ export class GoogleCalendarSyncService {
     await this.pruneMissingGoogleEvents(userId, timeMin, timeMax, seenIds);
     await this.pruneGoogleEventsOutsideWindow(userId, timeMin, timeMax);
 
+    const overlaps = await this.collectOverlapNotices(userId, changedGoogleIds);
+    if (overlaps.length > 0) {
+      await this.integrationService.mergePendingOverlapNotices(userId, overlaps);
+    }
+
     const syncedAt = new Date();
     await this.prisma.googleCalendarIntegration.update({
       where: { userId },
       data: { lastSyncedAt: syncedAt },
     });
 
-    return { imported, syncedAt: syncedAt.toISOString() };
+    return {
+      imported,
+      syncedAt: syncedAt.toISOString(),
+      overlaps,
+    };
+  }
+
+  private async collectOverlapNotices(
+    userId: string,
+    changedGoogleIds: Set<string>,
+  ): Promise<CalendarOverlapNotice[]> {
+    if (changedGoogleIds.size === 0) return [];
+
+    const allEvents = await this.prisma.event.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        title: true,
+        start: true,
+        end: true,
+        busy: true,
+        googleEventId: true,
+      },
+    });
+
+    const notices: CalendarOverlapNotice[] = [];
+    for (const event of allEvents) {
+      if (!event.googleEventId || !changedGoogleIds.has(event.googleEventId)) {
+        continue;
+      }
+      if (event.busy === false) continue;
+      const overlapping = findOverlappingEvents(allEvents, event, {
+        excludeId: event.id,
+      });
+      if (overlapping.length === 0) continue;
+      notices.push({
+        id: `overlap:${event.googleEventId}:${overlapping
+          .map((item) => item.id)
+          .sort()
+          .join(',')}`,
+        title: event.title,
+        overlappingTitles: overlapping.map((item) => item.title),
+        start: event.start.toISOString(),
+        end: event.end.toISOString(),
+      });
+    }
+    return notices;
   }
 
   private async fetchColorContext(

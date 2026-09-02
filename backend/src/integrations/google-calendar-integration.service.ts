@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { EventSource } from '../generated/prisma/client';
+import { EventSource, Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   DEFAULT_FRONTEND_REDIRECT,
@@ -11,6 +11,10 @@ import {
   DEFAULT_SYNC_DAYS_BACK,
   DEFAULT_SYNC_DAYS_FORWARD,
 } from './google-calendar-sync-window';
+import {
+  parseOverlapNotices,
+  type CalendarOverlapNotice,
+} from './google-calendar.types';
 import {
   GoogleOAuthService,
   type GoogleOAuthTokens,
@@ -22,6 +26,7 @@ export type GoogleCalendarConnectionStatus = {
   lastSyncedAt: string | null;
   syncDaysBack: number;
   syncDaysForward: number;
+  pendingOverlaps: CalendarOverlapNotice[];
 };
 
 @Injectable()
@@ -67,6 +72,7 @@ export class GoogleCalendarIntegrationService {
         lastSyncedAt: null,
         syncDaysBack: DEFAULT_SYNC_DAYS_BACK,
         syncDaysForward: DEFAULT_SYNC_DAYS_FORWARD,
+        pendingOverlaps: [],
       };
     }
     return {
@@ -75,6 +81,7 @@ export class GoogleCalendarIntegrationService {
       lastSyncedAt: row.lastSyncedAt?.toISOString() ?? null,
       syncDaysBack: row.syncDaysBack,
       syncDaysForward: row.syncDaysForward,
+      pendingOverlaps: parseOverlapNotices(row.pendingOverlapNotices),
     };
   }
 
@@ -111,6 +118,44 @@ export class GoogleCalendarIntegrationService {
     });
 
     return this.getStatus(userId);
+  }
+
+  async mergePendingOverlapNotices(
+    userId: string,
+    notices: CalendarOverlapNotice[],
+  ): Promise<CalendarOverlapNotice[]> {
+    const row = await this.prisma.googleCalendarIntegration.findUnique({
+      where: { userId },
+    });
+    if (!row) return notices;
+
+    const merged = new Map<string, CalendarOverlapNotice>();
+    for (const notice of parseOverlapNotices(row.pendingOverlapNotices)) {
+      merged.set(notice.id, notice);
+    }
+    for (const notice of notices) {
+      merged.set(notice.id, notice);
+    }
+    const next = [...merged.values()];
+    await this.prisma.googleCalendarIntegration.update({
+      where: { userId },
+      data: {
+        pendingOverlapNotices: next as Prisma.InputJsonValue,
+      },
+    });
+    return next;
+  }
+
+  async acknowledgeOverlapNotices(userId: string): Promise<boolean> {
+    const row = await this.prisma.googleCalendarIntegration.findUnique({
+      where: { userId },
+    });
+    if (!row) return false;
+    await this.prisma.googleCalendarIntegration.update({
+      where: { userId },
+      data: { pendingOverlapNotices: [] as Prisma.InputJsonValue },
+    });
+    return true;
   }
 
   async getValidAccessToken(userId: string): Promise<string> {

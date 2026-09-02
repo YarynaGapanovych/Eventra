@@ -80,6 +80,7 @@ model GoogleCalendarIntegration {
   lastSyncedAt          DateTime?
   syncDaysBack          Int       @default(30)
   syncDaysForward       Int       @default(90)
+  pendingOverlapNotices Json      @default("[]")
   updatedAt             DateTime  @updatedAt
 }
 
