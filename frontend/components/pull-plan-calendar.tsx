@@ -19,6 +19,10 @@ import {
   useUpdateEventMutation,
 } from "@/hooks/use-events";
 import { useTasksQuery } from "@/hooks/use-tasks";
+import {
+  FREE_HOSTING_WAKE_MESSAGE,
+  useApiWakeNotice,
+} from "@/hooks/use-api-wake-notice";
 import { parseMasterEventId } from "@/lib/calendar-details";
 import { type ApiEvent } from "@/lib/events-api";
 import {
@@ -30,7 +34,7 @@ import {
 import { syncEntityReminders } from "@/lib/reminder-storage";
 import { type ApiTask } from "@/lib/tasks-api";
 import dayjs from "dayjs";
-import { CalendarPlus, ChevronLeft, ChevronRight, Eye } from "lucide-react";
+import { CalendarPlus, ChevronLeft, ChevronRight, Eye, Loader2 } from "lucide-react";
 import {
   Calendar,
   mapEventToTask,
@@ -388,11 +392,15 @@ function PullPlanCalendarView() {
   const {
     data: tasks = [],
     error: tasksError,
-  } = useTasksQuery({ refetchInterval: 2500 });
+    isPending: tasksPending,
+  } = useTasksQuery();
   const {
     data: events = [],
     error: eventsError,
-  } = useEventsQuery({ refetchInterval: 2500 });
+    isPending: eventsPending,
+  } = useEventsQuery();
+  const { isWaking, showNotice } = useApiWakeNotice();
+  const calendarLoading = eventsPending || tasksPending;
   const calendarStatusQuery = useGoogleCalendarStatusQuery();
   const syncMutation = useSyncGoogleCalendarMutation();
   const createEventMutation = useCreateEventMutation();
@@ -432,8 +440,9 @@ function PullPlanCalendarView() {
 
   useEffect(() => {
     if (!error) return;
+    if (isWaking) return;
     toast.error(error, { id: "calendar-error" });
-  }, [error]);
+  }, [error, isWaking]);
 
   const { scheduledEvents, unscheduledEvents } = useMemo(() => {
     const unscheduled = tasks.filter((t) => (t.events?.length ?? 0) === 0);
@@ -544,6 +553,7 @@ function PullPlanCalendarView() {
 
   return (
     <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-3">
+      <div className="relative min-h-0 flex-1">
       <div
         ref={calendarRootRef}
         className="eventra-calendar-shell"
@@ -611,6 +621,26 @@ function PullPlanCalendarView() {
         EventActionButton={CalendarEventActionButton}
         EventDetailModal={CalendarEventDetailModal}
       />
+      </div>
+      {calendarLoading ? (
+        <div
+          className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-white/75 px-6 text-center backdrop-blur-[2px] dark:bg-zinc-950/70"
+          role="status"
+        >
+          <Loader2
+            className="size-6 animate-spin text-teal-700 dark:text-teal-400"
+            aria-hidden
+          />
+          <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100">
+            Loading calendar…
+          </p>
+          {showNotice ? (
+            <p className="max-w-md text-sm text-zinc-600 dark:text-zinc-400">
+              {FREE_HOSTING_WAKE_MESSAGE}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       </div>
     </div>
   );
