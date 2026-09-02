@@ -1,6 +1,56 @@
 import { Field, InputType, Int, ObjectType } from '@nestjs/graphql';
 import { IsInt, IsOptional, IsString, MinLength } from 'class-validator';
 
+export type CalendarOverlapNotice = {
+  id: string;
+  title: string;
+  overlappingTitles: string[];
+  start: string;
+  end: string;
+};
+
+export function parseOverlapNotices(value: unknown): CalendarOverlapNotice[] {
+  if (!Array.isArray(value)) return [];
+  const notices: CalendarOverlapNotice[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object') continue;
+    const row = item as Record<string, unknown>;
+    if (typeof row.id !== 'string' || typeof row.title !== 'string') continue;
+    if (typeof row.start !== 'string' || typeof row.end !== 'string') continue;
+    const overlappingTitles = Array.isArray(row.overlappingTitles)
+      ? row.overlappingTitles.filter(
+          (title): title is string => typeof title === 'string',
+        )
+      : [];
+    notices.push({
+      id: row.id,
+      title: row.title,
+      overlappingTitles,
+      start: row.start,
+      end: row.end,
+    });
+  }
+  return notices;
+}
+
+@ObjectType()
+export class GoogleCalendarOverlapNotice {
+  @Field()
+  id!: string;
+
+  @Field()
+  title!: string;
+
+  @Field(() => [String])
+  overlappingTitles!: string[];
+
+  @Field()
+  start!: string;
+
+  @Field()
+  end!: string;
+}
+
 @ObjectType()
 export class GoogleCalendarStatus {
   @Field()
@@ -17,6 +67,9 @@ export class GoogleCalendarStatus {
 
   @Field(() => Int)
   syncDaysForward!: number;
+
+  @Field(() => [GoogleCalendarOverlapNotice])
+  pendingOverlaps!: GoogleCalendarOverlapNotice[];
 }
 
 @ObjectType()
@@ -35,6 +88,9 @@ export class GoogleCalendarSyncPayload {
 
   @Field(() => Int)
   imported!: number;
+
+  @Field(() => [GoogleCalendarOverlapNotice])
+  overlaps!: GoogleCalendarOverlapNotice[];
 }
 
 @ObjectType()

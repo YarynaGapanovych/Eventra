@@ -10,6 +10,7 @@ export { COMPLETE_GOOGLE_LOGIN_MUTATION } from "./complete-google-login";
 export { START_GOOGLE_CALENDAR_CONNECT_MUTATION } from "./start-google-calendar-connect";
 export { DISCONNECT_GOOGLE_CALENDAR_MUTATION } from "./disconnect-google-calendar";
 export { SYNC_GOOGLE_CALENDAR_MUTATION } from "./sync-google-calendar";
+export { ACKNOWLEDGE_GOOGLE_CALENDAR_OVERLAPS_MUTATION } from "./acknowledge-google-calendar-overlaps";
 export { UPDATE_GOOGLE_CALENDAR_SYNC_WINDOW_MUTATION } from "./update-google-calendar-sync-window";
 export { UPDATE_USER_SETTINGS_MUTATION } from "./update-user-settings";
 export { CREATE_EVENT_MUTATION } from "./create-event";

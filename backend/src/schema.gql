@@ -137,10 +137,19 @@ type GoogleCalendarDisconnectPayload {
   ok: Boolean!
 }
 
+type GoogleCalendarOverlapNotice {
+  end: String!
+  id: String!
+  overlappingTitles: [String!]!
+  start: String!
+  title: String!
+}
+
 type GoogleCalendarStatus {
   connected: Boolean!
   connectedAt: String
   lastSyncedAt: String
+  pendingOverlaps: [GoogleCalendarOverlapNotice!]!
   syncDaysBack: Int!
   syncDaysForward: Int!
 }
@@ -148,6 +157,7 @@ type GoogleCalendarStatus {
 type GoogleCalendarSyncPayload {
   imported: Int!
   ok: Boolean!
+  overlaps: [GoogleCalendarOverlapNotice!]!
   syncedAt: String!
 }
 
@@ -164,6 +174,7 @@ input LoginInput {
 }
 
 type Mutation {
+  acknowledgeGoogleCalendarOverlaps: Boolean!
   askAssistant(content: String!): AssistantReply!
   completeGoogleLogin(code: String!): AuthPayload!
   createEvent(input: CreateEventInput!): Event!

@@ -42,6 +42,7 @@ import {
   Video,
 } from "lucide-react";
 import { useEffect, useId, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { toast } from "sonner";
 
 const selectClass = cn(
   "flex h-8 w-full rounded-lg border border-zinc-200 bg-zinc-100 px-2.5 py-1 text-sm shadow-none outline-none",
@@ -347,6 +348,12 @@ export function EventDetailsForm({
   const [showConference, setShowConference] = useState(
     Boolean(values.conferenceUrl),
   );
+
+  useEffect(() => {
+    if (!error) return;
+    toast.error(error, { id: "event-form-error" });
+  }, [error]);
+
   const zones = useMemo(() => listTimeZones(values.timezone), [values.timezone]);
   const startDate = values.startDate
     ? new Date(`${values.startDate}T12:00:00`)
@@ -774,12 +781,6 @@ export function EventDetailsForm({
           </div>
         </div>
       </div>
-
-      {error ? (
-        <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-          {error}
-        </p>
-      ) : null}
 
       <div className="flex items-center justify-between gap-3 pt-2">
         {onDelete && !readOnly ? (

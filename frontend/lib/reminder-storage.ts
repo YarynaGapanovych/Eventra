@@ -1,6 +1,7 @@
 export const NOTIF_KEY = "eventra.notifications.v1";
 export const REMINDER_KEY = "eventra.reminders.v1";
 export const ENTITY_REMINDER_PREFIX = "event-reminder:";
+export const NOTIFICATIONS_CHANGED_EVENT = "eventra-notifications-changed";
 
 export type StoredNotification = {
   id: string;
@@ -8,7 +9,7 @@ export type StoredNotification = {
   body?: string;
   createdAt: string;
   read: boolean;
-  kind: "system" | "reminder";
+  kind: "system" | "reminder" | "overlap";
 };
 
 export type StoredReminder = {
@@ -36,6 +37,49 @@ export function loadReminders(): StoredReminder[] {
 export function saveReminders(items: StoredReminder[]) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(REMINDER_KEY, JSON.stringify(items));
+}
+
+export function loadNotifications(): StoredNotification[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(NOTIF_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as StoredNotification[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveNotifications(items: StoredNotification[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(NOTIF_KEY, JSON.stringify(items));
+  window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
+}
+
+export function appendNotifications(
+  items: Array<
+    Omit<StoredNotification, "createdAt" | "read"> &
+      Partial<Pick<StoredNotification, "createdAt" | "read">>
+  >,
+): StoredNotification[] {
+  if (typeof window === "undefined") return [];
+  const existing = loadNotifications();
+  const seen = new Set(existing.map((item) => item.id));
+  const extras: StoredNotification[] = [];
+  for (const item of items) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    extras.push({
+      createdAt: new Date().toISOString(),
+      read: false,
+      ...item,
+    });
+  }
+  if (extras.length === 0) return existing;
+  const next = [...extras, ...existing];
+  saveNotifications(next);
+  return next;
 }
 
 export function syncEntityReminders(options: {
