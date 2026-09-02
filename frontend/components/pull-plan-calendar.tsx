@@ -54,6 +54,7 @@ import {
   type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
+import { toast } from "sonner";
 
 const calendarNavIconClass = "size-4 shrink-0";
 const CALENDAR_VIEW_STORAGE_KEY = "eventra.calendar.view.v1";
@@ -429,6 +430,11 @@ function PullPlanCalendarView() {
     });
   }, [calendarStatusQuery.data, syncMutation]);
 
+  useEffect(() => {
+    if (!error) return;
+    toast.error(error, { id: "calendar-error" });
+  }, [error]);
+
   const { scheduledEvents, unscheduledEvents } = useMemo(() => {
     const unscheduled = tasks.filter((t) => (t.events?.length ?? 0) === 0);
     return {
@@ -538,15 +544,6 @@ function PullPlanCalendarView() {
 
   return (
     <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-3">
-      {error ? (
-        <p
-          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200"
-          role="alert"
-        >
-          {error}
-        </p>
-      ) : null}
-
       <div
         ref={calendarRootRef}
         className="eventra-calendar-shell"

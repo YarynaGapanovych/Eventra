@@ -24,6 +24,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 function formatWhen(iso: string | null): string | null {
   if (!iso) return null;
@@ -94,6 +95,11 @@ export function GoogleCalendarSyncSection() {
         ? "Could not load calendar status."
         : null;
   const displayError = error ?? statusError;
+
+  useEffect(() => {
+    if (!displayError) return;
+    toast.error(displayError, { id: "google-calendar-error" });
+  }, [displayError]);
 
   const refetchStatus = statusQuery.refetch;
   const syncCalendar = syncMutation.mutateAsync;
@@ -394,12 +400,6 @@ export function GoogleCalendarSyncSection() {
       {oauthNotice ? (
         <p className="mt-2 text-sm text-teal-700 dark:text-teal-400">
           {oauthNotice}
-        </p>
-      ) : null}
-
-      {displayError ? (
-        <p className="mt-2 text-sm text-red-600 dark:text-red-400">
-          {displayError}
         </p>
       ) : null}
     </section>

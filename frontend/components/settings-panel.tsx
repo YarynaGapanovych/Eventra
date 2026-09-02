@@ -21,6 +21,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
+import { toast } from "sonner";
 import { z } from "zod/v3";
 
 const TIME_HM = /^(?:[01]?[0-9]|2[0-3]):[0-5][0-9]$/;
@@ -137,6 +138,11 @@ export function SettingsPanel() {
         ? "Could not load settings."
         : null;
   const displayError = saveError ?? loadError;
+
+  useEffect(() => {
+    if (!displayError) return;
+    toast.error(displayError, { id: "settings-error" });
+  }, [displayError]);
 
   async function onSubmit(values: SettingsFormValues) {
     if (!signedIn) return;
@@ -337,12 +343,6 @@ export function SettingsPanel() {
             <Link href="/" className="font-medium underline underline-offset-2">
               Go to sign in
             </Link>
-          </p>
-        ) : null}
-
-        {displayError ? (
-          <p className="text-sm text-red-600 dark:text-red-400">
-            {displayError}
           </p>
         ) : null}
       </form>
