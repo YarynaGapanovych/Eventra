@@ -69,7 +69,6 @@ export function CalendarEventDetailModal({
   const isUnscheduled = kind === "unscheduled-task" || Boolean(unscheduledId);
   const isGoogle = source === "google" || apiEvent?.source === "google";
   const showTaskFields = isUnscheduled || Boolean(apiTask);
-  const readOnly = isGoogle && !isUnscheduled;
 
   const [values, setValues] = useState<EventDetailsFormValues | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -214,7 +213,7 @@ export function CalendarEventDetailModal({
             minutesBefore: [],
           });
         }
-      } else if (masterId && !isGoogle) {
+      } else if (masterId) {
         await deleteEventMutation.mutateAsync(eventId ?? masterId);
         syncEntityReminders({
           entityId: masterId,
@@ -231,11 +230,7 @@ export function CalendarEventDetailModal({
 
   if (!isOpen || !values) return null;
 
-  const heading = isUnscheduled
-    ? "Unscheduled task"
-    : isGoogle
-      ? "Event details"
-      : "Edit event";
+  const heading = isUnscheduled ? "Unscheduled task" : "Edit event";
 
   return (
     <div
@@ -291,25 +286,24 @@ export function CalendarEventDetailModal({
             onSubmit={handleSubmit}
             onCancel={onClose}
             onDelete={
-              readOnly
-                ? undefined
-                : isUnscheduled && apiTask
+              isUnscheduled && apiTask
+                ? handleDelete
+                : masterId
                   ? handleDelete
-                  : masterId
-                    ? handleDelete
-                    : undefined
+                  : undefined
             }
             deleteLabel={isUnscheduled ? "Delete task" : "Delete event"}
             deleteConfirmHint={
               isUnscheduled && (apiTask?.events.length ?? 0) > 0
                 ? `${apiTask?.events.length} calendar block${apiTask?.events.length === 1 ? "" : "s"} will be removed.`
-                : undefined
+                : isGoogle
+                  ? "This will also delete it from Google Calendar."
+                  : undefined
             }
             deleting={
               deleteEventMutation.isPending || deleteTaskMutation.isPending
             }
             submitLabel="Save"
-            readOnly={readOnly}
             showTaskFields={showTaskFields}
             timesOptional={isUnscheduled}
             submitting={submitting}

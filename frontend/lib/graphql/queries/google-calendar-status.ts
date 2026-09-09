@@ -6,6 +6,15 @@ export const GOOGLE_CALENDAR_STATUS_QUERY = `
       lastSyncedAt
       syncDaysBack
       syncDaysForward
+      exportEventraEvents
+      pendingOverlaps {
+        id
+        title
+        overlappingTitles
+        start
+        end
+      }
     }
   }
 `;
+

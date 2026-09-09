@@ -1,8 +1,8 @@
-export const UPDATE_GOOGLE_CALENDAR_SYNC_WINDOW_MUTATION = `
-  mutation UpdateGoogleCalendarSyncWindow(
-    $input: UpdateGoogleCalendarSyncWindowInput!
-  ) {
-    updateGoogleCalendarSyncWindow(input: $input) {
+export const UPDATE_GOOGLE_CALENDAR_EXPORT_SETTING_MUTATION = `
+  mutation UpdateGoogleCalendarExportSetting($exportEventraEvents: Boolean!) {
+    updateGoogleCalendarExportSetting(
+      exportEventraEvents: $exportEventraEvents
+    ) {
       connected
       connectedAt
       lastSyncedAt

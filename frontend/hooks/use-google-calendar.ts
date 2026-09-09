@@ -1,8 +1,10 @@
 import { graphqlRequest } from "@/lib/graphql";
 import {
+  ACKNOWLEDGE_GOOGLE_CALENDAR_OVERLAPS_MUTATION,
   DISCONNECT_GOOGLE_CALENDAR_MUTATION,
   START_GOOGLE_CALENDAR_CONNECT_MUTATION,
   SYNC_GOOGLE_CALENDAR_MUTATION,
+  UPDATE_GOOGLE_CALENDAR_EXPORT_SETTING_MUTATION,
   UPDATE_GOOGLE_CALENDAR_SYNC_WINDOW_MUTATION,
 } from "@/lib/graphql/mutations";
 import { GOOGLE_CALENDAR_STATUS_QUERY } from "@/lib/graphql/queries";
@@ -77,12 +79,29 @@ export function useSyncGoogleCalendarMutation() {
     mutationFn: async () => {
       const data = await graphqlRequest<{
         syncGoogleCalendar: { syncedAt?: string };
-      }>(SYNC_GOOGLE_CALENDAR_MUTATION);
+      }>(SYNC_GOOGLE_CALENDAR_MUTATION, { incremental: false });
       return (
         data.syncGoogleCalendar.syncedAt ?? new Date().toISOString()
       );
     },
     onSuccess: invalidate,
+  });
+}
+
+export function useAcknowledgeGoogleCalendarOverlapsMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const data = await graphqlRequest<{
+        acknowledgeGoogleCalendarOverlaps?: boolean;
+      }>(ACKNOWLEDGE_GOOGLE_CALENDAR_OVERLAPS_MUTATION);
+      return data.acknowledgeGoogleCalendarOverlaps === true;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.googleCalendarStatus,
+      });
+    },
   });
 }
 
@@ -101,5 +120,28 @@ export function useUpdateGoogleCalendarSyncWindowMutation() {
       );
     },
     onSuccess: invalidate,
+  });
+}
+
+export function useUpdateGoogleCalendarExportSettingMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (exportEventraEvents: boolean) => {
+      const data = await graphqlRequest<{
+        updateGoogleCalendarExportSetting: Partial<GoogleCalendarSyncState>;
+      }>(UPDATE_GOOGLE_CALENDAR_EXPORT_SETTING_MUTATION, {
+        exportEventraEvents,
+      });
+      return normalizeGoogleCalendarStatus(
+        data.updateGoogleCalendarExportSetting,
+      );
+    },
+    onSuccess: (next) => {
+      const token = useAuthStore.getState().token ?? "anon";
+      queryClient.setQueryData(
+        [...queryKeys.googleCalendarStatus, token],
+        next,
+      );
+    },
   });
 }

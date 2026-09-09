@@ -156,3 +156,9 @@
     @apply font-sans text-base;
   }
 }
+
+.dark [data-sonner-toaster] {
+  --error-bg: rgb(69 10 10 / 0.5);
+  --error-border: #7f1d1d;
+  --error-text: #fecaca;
+}

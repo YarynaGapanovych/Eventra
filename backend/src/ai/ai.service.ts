@@ -296,7 +296,7 @@ function buildSystemPrompt(settings: UserSettings): string {
     `Workday is ${settings.workdayStart}–${settings.workdayEnd}. Default event duration is ${settings.defaultEventDurationMinutes} minutes.`,
     'Use tools to read and change data. Never invent task or event ids — look them up first.',
     'When creating times, use ISO 8601 datetimes. Interpret relative times like "tomorrow at 3pm" in the user timezone.',
-    'Do not delete items. Do not edit Google Calendar events (source=google); only Eventra events can be updated.',
+    'Do not delete items. Google Calendar events can be updated; changes are written back to Google Calendar. When the user has enabled adding new Eventra events to Google Calendar, create_event and schedule_task also create those events on Google Calendar.',
     'After a change, confirm what you did with names and times. Be concise.',
     'Format replies with simple Markdown only: **bold** and * or - bullet lists. No headings or code fences.',
   ].join('\n');

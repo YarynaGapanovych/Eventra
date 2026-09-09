@@ -19,7 +19,8 @@ import {
 import { cn } from "@/lib/utils";
 import { LayoutGrid, List, Plus } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 type View = "list" | "kanban";
 
@@ -66,6 +67,11 @@ export function TasksPanel({ query = "" }: { query?: string }) {
       : queryError
         ? "Could not load tasks."
         : null);
+
+  useEffect(() => {
+    if (!error) return;
+    toast.error(error, { id: "tasks-error" });
+  }, [error]);
 
   const openCreate = () => {
     setDialogMode("create");
@@ -216,15 +222,6 @@ export function TasksPanel({ query = "" }: { query?: string }) {
             </code>{" "}
             to use your API instead.
           </span>
-        </p>
-      ) : null}
-
-      {error ? (
-        <p
-          className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200"
-          role="alert"
-        >
-          {error}
         </p>
       ) : null}
 

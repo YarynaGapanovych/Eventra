@@ -2,16 +2,12 @@
 
 import { CalendarCreateEventModal } from "@/components/calendar-create-event-modal";
 import { CalendarEventDetailModal } from "@/components/calendar-event-detail-modal";
+import { OverlapConfirmDialog } from "@/components/overlap-confirm-dialog";
 import {
   EventCreateColorProvider,
   useEventCreateDraft,
 } from "@/components/event-create-color-context";
 import { Button } from "@/components/ui/button";
-import { getStoredAuth } from "@/lib/auth-api";
-import {
-  useGoogleCalendarStatusQuery,
-  useSyncGoogleCalendarMutation,
-} from "@/hooks/use-google-calendar";
 import {
   useCreateEventMutation,
   useEventsQuery,
@@ -19,7 +15,16 @@ import {
   useUpdateEventMutation,
 } from "@/hooks/use-events";
 import { useTasksQuery } from "@/hooks/use-tasks";
+import {
+  FREE_HOSTING_WAKE_MESSAGE,
+  useApiWakeNotice,
+} from "@/hooks/use-api-wake-notice";
 import { parseMasterEventId } from "@/lib/calendar-details";
+import {
+  findOverlappingEvents,
+  isOverlapConfirmCancelled,
+  OverlapConfirmCancelledError,
+} from "@/lib/event-overlap";
 import { type ApiEvent } from "@/lib/events-api";
 import {
   eventContrastText,
@@ -30,7 +35,7 @@ import {
 import { syncEntityReminders } from "@/lib/reminder-storage";
 import { type ApiTask } from "@/lib/tasks-api";
 import dayjs from "dayjs";
-import { CalendarPlus, ChevronLeft, ChevronRight, Eye } from "lucide-react";
+import { CalendarPlus, ChevronLeft, ChevronRight, Eye, Loader2 } from "lucide-react";
 import {
   Calendar,
   mapEventToTask,
@@ -54,6 +59,7 @@ import {
   type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
+import { toast } from "sonner";
 
 const calendarNavIconClass = "size-4 shrink-0";
 const CALENDAR_VIEW_STORAGE_KEY = "eventra.calendar.view.v1";
@@ -87,6 +93,30 @@ function writeStoredCalendarView(view: CalendarViewMode): void {
     window.localStorage.setItem(CALENDAR_VIEW_STORAGE_KEY, view);
   } catch {
     /* ignore */
+  }
+}
+
+const DAY_TITLE_FORMAT = "dddd, MMM D, YYYY";
+
+function dayViewNavTitle(root: HTMLElement): string | null {
+  const title = root.querySelector(
+    '[data-slot="day-view-nav"] [data-slot="title"]',
+  );
+  return title?.textContent?.trim() || null;
+}
+
+function revealTodayInDayView(root: HTMLElement): void {
+  const todayLabel = dayjs().format(DAY_TITLE_FORMAT);
+  if (dayViewNavTitle(root) === todayLabel) return;
+  const next = root.querySelector(
+    '[data-slot="day-view"] [aria-label="Next day"]',
+  );
+  if (!(next instanceof HTMLElement)) return;
+
+  const steps = dayjs().day();
+  for (let i = 0; i < steps; i++) {
+    if (dayViewNavTitle(root) === todayLabel) return;
+    next.click();
   }
 }
 
@@ -383,21 +413,27 @@ export function PullPlanCalendar() {
 function PullPlanCalendarView() {
   const [view, setView] = useState<CalendarViewMode>("day");
   const [actionError, setActionError] = useState<string | null>(null);
+  const [overlapPrompt, setOverlapPrompt] = useState<{
+    titles: string[];
+    confirmLabel: string;
+  } | null>(null);
+  const overlapResolverRef = useRef<((ok: boolean) => void) | null>(null);
   const calendarRootRef = useRef<HTMLDivElement>(null);
   const {
     data: tasks = [],
     error: tasksError,
-  } = useTasksQuery({ refetchInterval: 2500 });
+    isPending: tasksPending,
+  } = useTasksQuery();
   const {
     data: events = [],
     error: eventsError,
-  } = useEventsQuery({ refetchInterval: 2500 });
-  const calendarStatusQuery = useGoogleCalendarStatusQuery();
-  const syncMutation = useSyncGoogleCalendarMutation();
+    isPending: eventsPending,
+  } = useEventsQuery();
+  const { isWaking, showNotice } = useApiWakeNotice();
+  const calendarLoading = eventsPending || tasksPending;
   const createEventMutation = useCreateEventMutation();
   const updateEventMutation = useUpdateEventMutation();
   const scheduleTaskMutation = useScheduleTaskMutation();
-  const initialSyncStarted = useRef(false);
   const error =
     actionError ??
     (tasksError instanceof Error
@@ -417,17 +453,10 @@ function PullPlanCalendarView() {
   }, []);
 
   useEffect(() => {
-    const token = getStoredAuth()?.token;
-    const status = calendarStatusQuery.data;
-    if (!token || !status?.connected || status.lastSyncedAt) return;
-    if (initialSyncStarted.current) return;
-    initialSyncStarted.current = true;
-    void syncMutation.mutateAsync().catch((err: unknown) => {
-      setActionError(
-        err instanceof Error ? err.message : "Google Calendar sync failed",
-      );
-    });
-  }, [calendarStatusQuery.data, syncMutation]);
+    if (!error) return;
+    if (isWaking) return;
+    toast.error(error, { id: "calendar-error" });
+  }, [error, isWaking]);
 
   const { scheduledEvents, unscheduledEvents } = useMemo(() => {
     const unscheduled = tasks.filter((t) => (t.events?.length ?? 0) === 0);
@@ -438,33 +467,89 @@ function PullPlanCalendarView() {
   }, [events, tasks]);
 
   const { getDraft, setDraft } = useEventCreateDraft();
+
+  function settleOverlapPrompt(ok: boolean) {
+    overlapResolverRef.current?.(ok);
+    overlapResolverRef.current = null;
+    setOverlapPrompt(null);
+  }
+
+  function confirmOverlapIfNeeded(options: {
+    start: Date;
+    end: Date;
+    excludeId?: string | null;
+    busy?: boolean;
+    confirmLabel: string;
+  }): Promise<void> {
+    if (options.busy === false) return Promise.resolve();
+    const overlapping = findOverlappingEvents(events, options, {
+      excludeId: options.excludeId,
+    });
+    if (overlapping.length === 0) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      overlapResolverRef.current = (ok) => {
+        if (ok) resolve();
+        else reject(new OverlapConfirmCancelledError());
+      };
+      setOverlapPrompt({
+        titles: overlapping.map((event) => event.title),
+        confirmLabel: options.confirmLabel,
+      });
+    });
+  }
+
   const calendarKey = `${events
     .map((e) => `${e.id}:${e.color ?? ""}`)
     .join(",")}|${tasks.map((t) => t.id).join(",")}`;
+  const calendarInstanceKey = `${calendarKey}|${view === "day" ? "day" : "range"}`;
   const eventColorsCss = useMemo(
     () => eventColorCss(scheduledEvents),
     [scheduledEvents],
   );
 
   useEffect(() => {
+    if (calendarLoading) return;
     const root = calendarRootRef.current;
     if (!root) return;
-    const selected = root.querySelector(
-      '[data-slot="segmented-control-option"][aria-selected="true"]',
-    );
-    const current = selected?.getAttribute("data-value");
-    if (current === view) return;
-    const button = root.querySelector(
-      `[data-slot="segmented-control-option"][data-value="${view}"]`,
-    );
-    if (!(button instanceof HTMLElement)) return;
-    button.click();
-  }, [view, calendarKey]);
+
+    let clicks = 0;
+    const syncLibraryView = () => {
+      const dataView = root
+        .querySelector("[data-slot='calendar-content']")
+        ?.getAttribute("data-view");
+      if (dataView === view) {
+        if (view === "day") revealTodayInDayView(root);
+        return true;
+      }
+      if (clicks >= 3) return true;
+      const button = root.querySelector(
+        `[data-slot="segmented-control-option"][data-value="${view}"]`,
+      );
+      if (button instanceof HTMLElement) {
+        clicks += 1;
+        button.click();
+      }
+      return false;
+    };
+
+    if (syncLibraryView()) return;
+    const observer = new MutationObserver(() => {
+      if (syncLibraryView()) observer.disconnect();
+    });
+    observer.observe(root, { childList: true, subtree: true, attributes: true });
+    return () => observer.disconnect();
+  }, [view, calendarInstanceKey, calendarLoading]);
 
   async function handleEventCreate(payload: CalendarEventCreatePayload) {
     setActionError(null);
     try {
       const draft = getDraft();
+      await confirmOverlapIfNeeded({
+        start: dayjs(payload.start).toDate(),
+        end: dayjs(payload.end).toDate(),
+        busy: draft.busy,
+        confirmLabel: "Create anyway",
+      });
       const created = await createEventMutation.mutateAsync({
         title: payload.title.trim() || "Untitled event",
         start: payload.start.toISOString(),
@@ -490,6 +575,7 @@ function PullPlanCalendarView() {
         reminders: [],
       });
     } catch (err) {
+      if (isOverlapConfirmCancelled(err)) throw err;
       const message =
         err instanceof Error ? err.message : "Could not create event.";
       setActionError(message);
@@ -503,16 +589,17 @@ function PullPlanCalendarView() {
     const matched =
       events.find((e) => e.id === payload.id) ??
       events.find((e) => e.id === parseMasterEventId(payload.id));
-    const source = matched?.source;
-    if (source === "google") {
-      const message = "Google Calendar events cannot be edited in Eventra.";
-      setActionError(message);
-      throw new Error(message);
-    }
 
     const taskId = unscheduledTaskId(payload.id);
     setActionError(null);
     try {
+      await confirmOverlapIfNeeded({
+        start: dayjs(payload.start).toDate(),
+        end: dayjs(payload.end).toDate(),
+        excludeId: taskId ? null : payload.id,
+        busy: matched?.busy ?? true,
+        confirmLabel: taskId ? "Schedule anyway" : "Save anyway",
+      });
       if (taskId) {
         await scheduleTaskMutation.mutateAsync({
           taskId,
@@ -529,6 +616,7 @@ function PullPlanCalendarView() {
         },
       });
     } catch (err) {
+      if (isOverlapConfirmCancelled(err)) throw err;
       const message =
         err instanceof Error ? err.message : "Could not update event.";
       setActionError(message);
@@ -538,15 +626,7 @@ function PullPlanCalendarView() {
 
   return (
     <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-3">
-      {error ? (
-        <p
-          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200"
-          role="alert"
-        >
-          {error}
-        </p>
-      ) : null}
-
+      <div className="relative min-h-0 flex-1">
       <div
         ref={calendarRootRef}
         className="eventra-calendar-shell"
@@ -568,10 +648,29 @@ function PullPlanCalendarView() {
       <CalendarAddEventOverlays
         rootRef={calendarRootRef}
         view={view}
-        calendarKey={calendarKey}
+        calendarKey={calendarInstanceKey}
       />
+      {calendarLoading ? (
+        <div
+          className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-white/75 px-6 text-center backdrop-blur-[2px] dark:bg-zinc-950/70"
+          role="status"
+        >
+          <Loader2
+            className="size-6 animate-spin text-teal-700 dark:text-teal-400"
+            aria-hidden
+          />
+          <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100">
+            Loading calendar…
+          </p>
+          {showNotice ? (
+            <p className="max-w-md text-sm text-zinc-600 dark:text-zinc-400">
+              {FREE_HOSTING_WAKE_MESSAGE}
+            </p>
+          ) : null}
+        </div>
+      ) : (
       <Calendar
-        key={calendarKey}
+        key={calendarInstanceKey}
         showSwitcher={true}
         views={["week", "year", "day", "month"]}
         defaultScheduledEvents={scheduledEvents}
@@ -613,6 +712,15 @@ function PullPlanCalendarView() {
         CreateEventModal={CalendarCreateEventModal}
         EventActionButton={CalendarEventActionButton}
         EventDetailModal={CalendarEventDetailModal}
+      />
+      )}
+      </div>
+      <OverlapConfirmDialog
+        open={overlapPrompt !== null}
+        titles={overlapPrompt?.titles ?? []}
+        confirmLabel={overlapPrompt?.confirmLabel ?? "Create anyway"}
+        onCancel={() => settleOverlapPrompt(false)}
+        onConfirm={() => settleOverlapPrompt(true)}
       />
       </div>
     </div>

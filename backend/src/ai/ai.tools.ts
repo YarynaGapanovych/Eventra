@@ -116,7 +116,8 @@ export const TOOL_DECLARATIONS: FunctionDeclaration[] = [
   },
   {
     name: 'create_event',
-    description: 'Create an Eventra calendar event (not a Google Calendar event).',
+    description:
+      'Create an Eventra calendar event. If the user has enabled adding new Eventra events to Google Calendar, a copy is also created on their primary Google Calendar.',
     parameters: {
       type: Type.OBJECT,
       properties: {
@@ -133,7 +134,7 @@ export const TOOL_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: 'update_event',
     description:
-      'Update an Eventra calendar event by id. Google Calendar events cannot be edited.',
+      'Update a calendar event by id. Google Calendar events are updated in Google as well.',
     parameters: {
       type: Type.OBJECT,
       properties: {
@@ -149,7 +150,8 @@ export const TOOL_DECLARATIONS: FunctionDeclaration[] = [
   },
   {
     name: 'schedule_task',
-    description: 'Put an existing task on the calendar with a start and end time.',
+    description:
+      'Put an existing task on the calendar with a start and end time. If adding new Eventra events to Google Calendar is enabled, the scheduled block is also created on Google Calendar.',
     parameters: {
       type: Type.OBJECT,
       properties: {

@@ -4,12 +4,22 @@ export const DEFAULT_SYNC_DAYS_FORWARD = 90;
 export const SYNC_DAYS_BACK_PRESETS = [7, 14, 30, 90, 180, 365] as const;
 export const SYNC_DAYS_FORWARD_PRESETS = [30, 90, 180, 365] as const;
 
+export type GoogleCalendarOverlapNotice = {
+  id: string;
+  title: string;
+  overlappingTitles: string[];
+  start: string;
+  end: string;
+};
+
 export type GoogleCalendarSyncState = {
   connected: boolean;
   connectedAt: string | null;
   lastSyncedAt: string | null;
   syncDaysBack: number;
   syncDaysForward: number;
+  exportEventraEvents: boolean;
+  pendingOverlaps: GoogleCalendarOverlapNotice[];
 };
 
 export const googleCalendarDefaultState: GoogleCalendarSyncState = {
@@ -18,6 +28,8 @@ export const googleCalendarDefaultState: GoogleCalendarSyncState = {
   lastSyncedAt: null,
   syncDaysBack: DEFAULT_SYNC_DAYS_BACK,
   syncDaysForward: DEFAULT_SYNC_DAYS_FORWARD,
+  exportEventraEvents: false,
+  pendingOverlaps: [],
 };
 
 function coercePreset(
@@ -27,6 +39,30 @@ function coercePreset(
 ): number {
   const n = typeof value === "number" ? value : Number(value);
   return presets.includes(n) ? n : fallback;
+}
+
+function parseOverlapNotices(value: unknown): GoogleCalendarOverlapNotice[] {
+  if (!Array.isArray(value)) return [];
+  const notices: GoogleCalendarOverlapNotice[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    if (typeof row.id !== "string" || typeof row.title !== "string") continue;
+    if (typeof row.start !== "string" || typeof row.end !== "string") continue;
+    const overlappingTitles = Array.isArray(row.overlappingTitles)
+      ? row.overlappingTitles.filter(
+          (title): title is string => typeof title === "string",
+        )
+      : [];
+    notices.push({
+      id: row.id,
+      title: row.title,
+      overlappingTitles,
+      start: row.start,
+      end: row.end,
+    });
+  }
+  return notices;
 }
 
 export function normalizeGoogleCalendarStatus(
@@ -48,5 +84,7 @@ export function normalizeGoogleCalendarStatus(
       SYNC_DAYS_FORWARD_PRESETS,
       DEFAULT_SYNC_DAYS_FORWARD,
     ),
+    exportEventraEvents: data.exportEventraEvents === true,
+    pendingOverlaps: parseOverlapNotices(data.pendingOverlaps),
   };
 }

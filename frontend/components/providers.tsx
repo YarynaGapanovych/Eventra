@@ -1,5 +1,6 @@
 "use client";
 
+import { Toaster } from "@/components/ui/sonner";
 import { useAuthStore } from "@/stores/auth-store";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
@@ -31,7 +32,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
     () =>
       new QueryClient({
         defaultOptions: {
-          queries: { staleTime: 30_000, retry: 1 },
+          queries: {
+            staleTime: 30_000,
+            retry: 4,
+            retryDelay: (attempt) => Math.min(2000 * 2 ** attempt, 15_000),
+          },
         },
       }),
   );
@@ -40,6 +45,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <AuthHydrator />
       {children}
+      <Toaster
+        position="bottom-right"
+        richColors
+        toastOptions={{
+          classNames: {
+            toast: "cn-toast",
+            error:
+              "border border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200",
+          },
+        }}
+      />
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   );

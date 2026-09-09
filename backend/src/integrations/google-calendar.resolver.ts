@@ -63,9 +63,26 @@ export class GoogleCalendarResolver {
   @Mutation(() => GoogleCalendarSyncPayload)
   async syncGoogleCalendar(
     @CurrentUser() user: JwtUser,
+    @Args('incremental', { type: () => Boolean, nullable: true })
+    incremental?: boolean,
   ): Promise<GoogleCalendarSyncPayload> {
-    const result = await this.syncService.syncForUser(user.userId);
-    return { ok: true, syncedAt: result.syncedAt, imported: result.imported };
+    const result = await this.syncService.syncForUser(user.userId, {
+      incremental: incremental === true,
+    });
+    return {
+      ok: true,
+      syncedAt: result.syncedAt,
+      imported: result.imported,
+      changed: result.changed,
+      overlaps: result.overlaps,
+    };
+  }
+
+  @Mutation(() => Boolean)
+  async acknowledgeGoogleCalendarOverlaps(
+    @CurrentUser() user: JwtUser,
+  ): Promise<boolean> {
+    return this.integrationService.acknowledgeOverlapNotices(user.userId);
   }
 
   @Mutation(() => GoogleCalendarStatus)
@@ -77,6 +94,18 @@ export class GoogleCalendarResolver {
       user.userId,
       clampSyncDaysBack(input.syncDaysBack),
       clampSyncDaysForward(input.syncDaysForward),
+    );
+  }
+
+  @Mutation(() => GoogleCalendarStatus)
+  updateGoogleCalendarExportSetting(
+    @CurrentUser() user: JwtUser,
+    @Args('exportEventraEvents', { type: () => Boolean })
+    exportEventraEvents: boolean,
+  ): Promise<GoogleCalendarStatus> {
+    return this.integrationService.updateExportSetting(
+      user.userId,
+      exportEventraEvents,
     );
   }
 }

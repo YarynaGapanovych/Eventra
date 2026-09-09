@@ -1,6 +1,24 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { useEventsQuery } from "@/hooks/use-events";
+import { useTasksQuery } from "@/hooks/use-tasks";
+import { useUserSettingsQuery } from "@/hooks/use-user-settings";
+import {
+  DEFAULT_APP_SETTINGS,
+  getDefaultTimezone,
+} from "@/lib/app-settings";
+import {
+  ANALYTICS_RANGES,
+  computeAttention,
+  computeDailyLoad,
+  computeFrequentEvents,
+  computePeakHours,
+  computeTaskBlocksByDay,
+  type AnalyticsRange,
+} from "@/lib/daily-load";
+import { computeDeadlines, computeUnscheduledHigh } from "@/lib/task-analytics";
+import { TASK_STATUS_LABELS, type TaskBoardStatus } from "@/lib/tasks-api";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
@@ -8,9 +26,10 @@ import {
   CalendarOff,
   CalendarRange,
   ClipboardList,
+  Loader2,
   Repeat,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -22,46 +41,12 @@ import {
   YAxis,
 } from "recharts";
 
-const RANGES = ["This week", "Last 7 days", "This month"] as const;
-type AnalyticsRange = (typeof RANGES)[number];
+const RANGES = ANALYTICS_RANGES;
 
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"] as const;
-const WORK_HOURS = [9, 10, 11, 12, 13, 14, 15, 16] as const;
-
-type DayHours = {
-  day: string;
-  booked: number;
-  free: number;
-  capacity: number;
-};
-
-type AttentionItem = {
-  kind: "overlap" | "overload";
-  title: string;
-  detail: string;
-};
-
-type DeadlineItem = {
-  task: string;
-  due: string;
-  priority: "High" | "Medium" | "Low";
-  overdue: boolean;
-};
-
-type FrequentEvent = {
-  title: string;
-  count: number;
-  hours: number;
-};
-
-type TasksByDay = {
-  day: string;
-  tasks: number;
-};
-
-type UnscheduledTask = {
-  task: string;
-  due: string;
+const EMPTY_MESSAGES: Record<AnalyticsRange, string> = {
+  "This week": "Nothing scheduled this week",
+  "Last 7 days": "Nothing scheduled in the last 7 days",
+  "This month": "Nothing scheduled this month",
 };
 
 type BoardCounts = {
@@ -70,299 +55,26 @@ type BoardCounts = {
   done: number;
 };
 
-type RangeSnapshot = {
-  hoursByDay: DayHours[];
-  peakMinutes: number[][];
-  busiest: { day: string; slot: string };
-  frequent: FrequentEvent[];
-  tasksByDay: TasksByDay[];
-  avgTasksPerWorkday: number;
-  attention: AttentionItem[];
-  deadlines: DeadlineItem[];
-  unscheduledHigh: UnscheduledTask[];
+const BOARD_ROW_COLORS: Record<TaskBoardStatus, string> = {
+  todo: "#94a3b8",
+  in_progress: "#0f766e",
+  done: "#334155",
 };
 
-const BOARD: BoardCounts = { todo: 5, inProgress: 3, done: 4 };
+function countBoardStatuses(tasks: { status: TaskBoardStatus }[]): BoardCounts {
+  const counts: BoardCounts = { todo: 0, inProgress: 0, done: 0 };
+  for (const task of tasks) {
+    if (task.status === "todo") counts.todo += 1;
+    else if (task.status === "in_progress") counts.inProgress += 1;
+    else if (task.status === "done") counts.done += 1;
+  }
+  return counts;
+}
+
 const DEADLINE_LIMIT = 5;
 const FREQUENT_LIMIT = 5;
 const UNSCHEDULED_LIMIT = 5;
-
-function dayLoad(day: string, booked: number, capacity: number): DayHours {
-  return {
-    day,
-    booked,
-    capacity,
-    free: Math.max(0, Math.round((capacity - booked) * 10) / 10),
-  };
-}
-
-const SNAPSHOTS: Record<AnalyticsRange, RangeSnapshot> = {
-  "This week": {
-    hoursByDay: [
-      dayLoad("Mon", 6.5, 8),
-      dayLoad("Tue", 8.2, 8),
-      dayLoad("Wed", 9.1, 8),
-      dayLoad("Thu", 6, 8),
-      dayLoad("Fri", 5.2, 8),
-      dayLoad("Sat", 2, 0),
-      dayLoad("Sun", 0, 0),
-    ],
-    peakMinutes: [
-      [20, 45, 30, 15, 50, 40, 10, 0],
-      [40, 55, 60, 35, 50, 45, 25, 10],
-      [50, 60, 60, 45, 55, 50, 40, 20],
-      [15, 50, 25, 10, 40, 30, 20, 5],
-      [10, 20, 35, 15, 40, 25, 15, 0],
-    ],
-    busiest: { day: "Wed", slot: "10:00–11:00" },
-    frequent: [
-      { title: "Team standup", count: 4, hours: 2 },
-      { title: "Design sync", count: 3, hours: 4.5 },
-      { title: "1:1", count: 2, hours: 1.5 },
-      { title: "API review", count: 2, hours: 2 },
-      { title: "Focus block", count: 2, hours: 3 },
-    ],
-    tasksByDay: [
-      { day: "Mon", tasks: 3 },
-      { day: "Tue", tasks: 4 },
-      { day: "Wed", tasks: 5 },
-      { day: "Thu", tasks: 2 },
-      { day: "Fri", tasks: 2 },
-    ],
-    avgTasksPerWorkday: 3.2,
-    attention: [
-      {
-        kind: "overlap",
-        title: "Design sync overlaps standup",
-        detail: "Tue 14:00–15:30 and Team standup 14:15–15:00.",
-      },
-      {
-        kind: "overlap",
-        title: "API review overlaps 1:1",
-        detail: "Thu 10:00–11:00 and 10:30–11:15.",
-      },
-      {
-        kind: "overload",
-        title: "Wednesday is overloaded",
-        detail: "9.1h booked against an 8h workday.",
-      },
-      {
-        kind: "overload",
-        title: "Tuesday is slightly over",
-        detail: "8.2h booked against an 8h workday.",
-      },
-    ],
-    deadlines: [
-      {
-        task: "Write Q1 wrap-up notes",
-        due: "2 days ago",
-        priority: "High",
-        overdue: true,
-      },
-      {
-        task: "Share hiring scorecard",
-        due: "Yesterday",
-        priority: "Medium",
-        overdue: true,
-      },
-      {
-        task: "Confirm vendor invoice",
-        due: "3 days ago",
-        priority: "Low",
-        overdue: true,
-      },
-      {
-        task: "Sprint kickoff & goals",
-        due: "Fri 5:00 PM",
-        priority: "High",
-        overdue: false,
-      },
-      {
-        task: "API contract review",
-        due: "Wed 4:00 PM",
-        priority: "High",
-        overdue: false,
-      },
-    ],
-    unscheduledHigh: [
-      { task: "Security review for auth", due: "Thu" },
-      { task: "Customer interview notes", due: "Fri" },
-      { task: "Offline mode spike", due: "No date" },
-    ],
-  },
-  "Last 7 days": {
-    hoursByDay: [
-      dayLoad("Thu", 5.5, 8),
-      dayLoad("Fri", 7, 8),
-      dayLoad("Sat", 1.5, 0),
-      dayLoad("Sun", 0, 0),
-      dayLoad("Mon", 6, 8),
-      dayLoad("Tue", 8.4, 8),
-      dayLoad("Wed", 3.1, 8),
-    ],
-    peakMinutes: [
-      [15, 40, 25, 10, 45, 30, 15, 0],
-      [45, 60, 50, 20, 55, 50, 30, 15],
-      [20, 25, 15, 5, 20, 10, 5, 0],
-      [10, 45, 20, 10, 35, 25, 10, 0],
-      [25, 40, 50, 20, 45, 20, 10, 0],
-    ],
-    busiest: { day: "Tue", slot: "10:00–11:00" },
-    frequent: [
-      { title: "Team standup", count: 5, hours: 2.5 },
-      { title: "Planning", count: 2, hours: 2 },
-      { title: "1:1", count: 2, hours: 1.5 },
-      { title: "Focus block", count: 2, hours: 2.5 },
-    ],
-    tasksByDay: [
-      { day: "Mon", tasks: 2 },
-      { day: "Tue", tasks: 4 },
-      { day: "Wed", tasks: 1 },
-      { day: "Thu", tasks: 3 },
-      { day: "Fri", tasks: 3 },
-    ],
-    avgTasksPerWorkday: 2.6,
-    attention: [
-      {
-        kind: "overlap",
-        title: "Planning overlaps focus block",
-        detail: "Tue 11:00–12:00 and 11:30–12:30.",
-      },
-      {
-        kind: "overload",
-        title: "Tuesday is overloaded",
-        detail: "8.4h booked against an 8h workday.",
-      },
-    ],
-    deadlines: [
-      {
-        task: "Write Q1 wrap-up notes",
-        due: "2 days ago",
-        priority: "High",
-        overdue: true,
-      },
-      {
-        task: "Share hiring scorecard",
-        due: "Yesterday",
-        priority: "Medium",
-        overdue: true,
-      },
-      {
-        task: "Confirm vendor invoice",
-        due: "3 days ago",
-        priority: "Low",
-        overdue: true,
-      },
-      {
-        task: "API contract review",
-        due: "Tomorrow 4:00 PM",
-        priority: "High",
-        overdue: false,
-      },
-      {
-        task: "Update burndown & velocity",
-        due: "In 2 days",
-        priority: "Medium",
-        overdue: false,
-      },
-    ],
-    unscheduledHigh: [
-      { task: "Security review for auth", due: "Thu" },
-      { task: "Customer interview notes", due: "Fri" },
-    ],
-  },
-  "This month": {
-    hoursByDay: [
-      dayLoad("Week 1", 34, 40),
-      dayLoad("Week 2", 41, 40),
-      dayLoad("Week 3", 29, 40),
-      dayLoad("Week 4", 24, 40),
-    ],
-    peakMinutes: [
-      [25, 40, 35, 20, 45, 35, 15, 5],
-      [40, 55, 50, 30, 50, 45, 25, 10],
-      [50, 60, 55, 40, 55, 50, 35, 15],
-      [20, 40, 30, 15, 40, 30, 20, 5],
-      [15, 30, 35, 20, 40, 25, 15, 5],
-    ],
-    busiest: { day: "Wed", slot: "10:00–11:00" },
-    frequent: [
-      { title: "Team standup", count: 18, hours: 9 },
-      { title: "1:1", count: 8, hours: 6 },
-      { title: "Design sync", count: 6, hours: 9 },
-      { title: "Sprint planning", count: 4, hours: 6 },
-      { title: "Focus block", count: 4, hours: 8 },
-    ],
-    tasksByDay: [
-      { day: "Mon", tasks: 2.8 },
-      { day: "Tue", tasks: 3.6 },
-      { day: "Wed", tasks: 4.1 },
-      { day: "Thu", tasks: 2.4 },
-      { day: "Fri", tasks: 2.1 },
-    ],
-    avgTasksPerWorkday: 3,
-    attention: [
-      {
-        kind: "overlap",
-        title: "Design sync overlaps standup",
-        detail: "Tue 14:00–15:30 and Team standup 14:15–15:00.",
-      },
-      {
-        kind: "overlap",
-        title: "API review overlaps 1:1",
-        detail: "Thu 10:00–11:00 and 10:30–11:15.",
-      },
-      {
-        kind: "overlap",
-        title: "Retro prep overlaps wrap-up",
-        detail: "Fri 15:00–16:00 and 15:30–16:30.",
-      },
-      {
-        kind: "overload",
-        title: "Week 2 is overloaded",
-        detail: "41h booked against 40h workday capacity.",
-      },
-    ],
-    deadlines: [
-      {
-        task: "Write Q1 wrap-up notes",
-        due: "2 days ago",
-        priority: "High",
-        overdue: true,
-      },
-      {
-        task: "Share hiring scorecard",
-        due: "Yesterday",
-        priority: "Medium",
-        overdue: true,
-      },
-      {
-        task: "Confirm vendor invoice",
-        due: "3 days ago",
-        priority: "Low",
-        overdue: true,
-      },
-      {
-        task: "Sprint kickoff & goals",
-        due: "Fri 5:00 PM",
-        priority: "High",
-        overdue: false,
-      },
-      {
-        task: "Retro prep — gather themes",
-        due: "Next week",
-        priority: "Medium",
-        overdue: false,
-      },
-    ],
-    unscheduledHigh: [
-      { task: "Security review for auth", due: "Thu" },
-      { task: "Customer interview notes", due: "Fri" },
-      { task: "Offline mode spike", due: "No date" },
-      { task: "Incident playbook draft", due: "No date" },
-    ],
-  },
-};
+const ATTENTION_LIMIT = 6;
 
 function formatHours(hours: number): string {
   const rounded = Math.round(hours * 10) / 10;
@@ -418,7 +130,16 @@ function EmptyState({ icon: Icon, message }: { icon: typeof CalendarOff; message
   );
 }
 
-function priorityClass(priority: DeadlineItem["priority"]) {
+function LoadingState({ message }: { message: string }) {
+  return (
+    <p className="flex items-center gap-2 rounded-xl border border-dashed border-zinc-200 px-3 py-6 text-sm text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+      <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+      {message}
+    </p>
+  );
+}
+
+function priorityClass(priority: "High" | "Medium" | "Low") {
   return cn(
     "rounded-full px-2 py-0.5 text-[11px] font-medium",
     priority === "High" && "bg-rose-100 text-rose-700 dark:bg-rose-900/35 dark:text-rose-300",
@@ -430,17 +151,86 @@ function priorityClass(priority: DeadlineItem["priority"]) {
 
 export default function AnalyticsPage() {
   const [range, setRange] = useState<AnalyticsRange>("This week");
-  const snapshot = SNAPSHOTS[range];
-  const deadlines = snapshot.deadlines.slice(0, DEADLINE_LIMIT);
-  const frequent = snapshot.frequent.slice(0, FREQUENT_LIMIT);
-  const unscheduledHigh = snapshot.unscheduledHigh.slice(0, UNSCHEDULED_LIMIT);
-  const boardTotal = BOARD.todo + BOARD.inProgress + BOARD.done;
-  const chartEmpty = snapshot.hoursByDay.every((day) => day.booked === 0);
+  const eventsQuery = useEventsQuery();
+  const tasksQuery = useTasksQuery();
+  const settingsQuery = useUserSettingsQuery();
 
+  const settings = useMemo(
+    () =>
+      settingsQuery.data ?? {
+        ...DEFAULT_APP_SETTINGS,
+        timezone: getDefaultTimezone(),
+      },
+    [settingsQuery.data],
+  );
+
+  const hoursByDay = useMemo(
+    () => computeDailyLoad(eventsQuery.data ?? [], settings, range),
+    [eventsQuery.data, settings, range],
+  );
+  const peakHours = useMemo(
+    () => computePeakHours(eventsQuery.data ?? [], settings, range),
+    [eventsQuery.data, settings, range],
+  );
+  const frequent = useMemo(
+    () =>
+      computeFrequentEvents(
+        eventsQuery.data ?? [],
+        settings,
+        range,
+        FREQUENT_LIMIT,
+      ),
+    [eventsQuery.data, settings, range],
+  );
+  const attention = useMemo(
+    () =>
+      computeAttention(
+        eventsQuery.data ?? [],
+        settings,
+        range,
+        ATTENTION_LIMIT,
+      ),
+    [eventsQuery.data, settings, range],
+  );
+  const taskBlocks = useMemo(
+    () => computeTaskBlocksByDay(eventsQuery.data ?? [], settings, range),
+    [eventsQuery.data, settings, range],
+  );
+  const deadlines = useMemo(
+    () =>
+      computeDeadlines(
+        tasksQuery.data ?? [],
+        settings.timezone,
+        DEADLINE_LIMIT,
+      ),
+    [tasksQuery.data, settings.timezone],
+  );
+  const unscheduledHigh = useMemo(
+    () =>
+      computeUnscheduledHigh(
+        tasksQuery.data ?? [],
+        settings.timezone,
+        UNSCHEDULED_LIMIT,
+      ),
+    [tasksQuery.data, settings.timezone],
+  );
+
+  const chartLoading = eventsQuery.isPending && !eventsQuery.data;
+  const chartEmpty = hoursByDay.every((day) => day.booked === 0);
+  const taskBarsEmpty = taskBlocks.tasksByDay.every((day) => day.tasks === 0);
+  const taskBarsAllowDecimals = taskBlocks.tasksByDay.some(
+    (day) => !Number.isInteger(day.tasks),
+  );
+  const board = useMemo(
+    () => countBoardStatuses(tasksQuery.data ?? []),
+    [tasksQuery.data],
+  );
+  const boardTotal = board.todo + board.inProgress + board.done;
+  const boardLoading = tasksQuery.isPending && !tasksQuery.data;
   const boardRows = [
-    { label: "To do", count: BOARD.todo, color: "#94a3b8" },
-    { label: "In progress", count: BOARD.inProgress, color: "#0f766e" },
-    { label: "Done", count: BOARD.done, color: "#334155" },
+    { status: "todo" as const, count: board.todo },
+    { status: "in_progress" as const, count: board.inProgress },
+    { status: "done" as const, count: board.done },
   ];
 
   return (
@@ -474,15 +264,17 @@ export default function AnalyticsPage() {
       <section className="grid gap-4 xl:grid-cols-12">
         <SectionCard
           title="Loaded vs free"
-          subtitle={`Booked and free time against a 09:00–17:00 workday · ${range}`}
+          subtitle={`Booked and free time against a ${settings.workdayStart}–${settings.workdayEnd} workday · ${range}`}
           className="xl:col-span-8"
         >
-          {chartEmpty ? (
-            <EmptyState icon={CalendarOff} message="Nothing scheduled this week" />
+          {chartLoading ? (
+            <LoadingState message="Loading schedule…" />
+          ) : chartEmpty ? (
+            <EmptyState icon={CalendarOff} message={EMPTY_MESSAGES[range]} />
           ) : (
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={snapshot.hoursByDay}>
+                <BarChart data={hoursByDay}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" />
                   <XAxis dataKey="day" tickLine={false} axisLine={false} />
                   <YAxis tickLine={false} axisLine={false} width={30} />
@@ -495,7 +287,7 @@ export default function AnalyticsPage() {
                     ]}
                   />
                   <Bar dataKey="booked" stackId="load" maxBarSize={34}>
-                    {snapshot.hoursByDay.map((entry) => (
+                    {hoursByDay.map((entry) => (
                       <Cell
                         key={entry.day}
                         fill={
@@ -519,13 +311,15 @@ export default function AnalyticsPage() {
 
         <aside className="xl:col-span-4">
           <SectionCard title="Needs attention" subtitle="Overlaps and overloaded days">
-            {snapshot.attention.length === 0 ? (
-              <EmptyState icon={CalendarOff} message="No overlaps" />
+            {chartLoading ? (
+              <LoadingState message="Loading schedule…" />
+            ) : attention.length === 0 ? (
+              <EmptyState icon={CalendarOff} message="Nothing needs attention" />
             ) : (
               <div className="space-y-3">
-                {snapshot.attention.map((item) => (
+                {attention.map((item) => (
                   <article
-                    key={item.title}
+                    key={`${item.kind}-${item.title}-${item.detail}`}
                     className="rounded-xl border border-amber-200/80 bg-amber-50/70 p-3 dark:border-amber-900/50 dark:bg-amber-950/20"
                   >
                     <p className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-800 dark:text-amber-300">
@@ -544,53 +338,65 @@ export default function AnalyticsPage() {
       <section className="grid gap-4 xl:grid-cols-12">
         <SectionCard
           title="Peak hours"
-          subtitle="How full each weekday hour is · 09:00–17:00"
+          subtitle={`How full each weekday hour is · ${settings.workdayStart}–${settings.workdayEnd}`}
           className="xl:col-span-8"
         >
-          <div className="overflow-x-auto">
-            <div
-              className="grid min-w-md gap-1"
-              style={{ gridTemplateColumns: `2.5rem repeat(${WORK_HOURS.length}, minmax(0, 1fr))` }}
-            >
-              <div />
-              {WORK_HOURS.map((hour) => (
+          {chartLoading ? (
+            <LoadingState message="Loading schedule…" />
+          ) : (
+            <>
+              <div className="overflow-x-auto">
                 <div
-                  key={hour}
-                  className="text-center text-[10px] font-medium text-zinc-500 dark:text-zinc-400"
+                  className="grid min-w-md gap-1"
+                  style={{
+                    gridTemplateColumns: `2.5rem repeat(${Math.max(peakHours.hours.length, 1)}, minmax(0, 1fr))`,
+                  }}
                 >
-                  {hour}
+                  <div />
+                  {peakHours.hours.map((hour) => (
+                    <div
+                      key={hour}
+                      className="text-center text-[10px] font-medium text-zinc-500 dark:text-zinc-400"
+                    >
+                      {hour}
+                    </div>
+                  ))}
+                  {peakHours.weekdays.map((day, dayIndex) => (
+                    <div key={day} className="contents">
+                      <div className="flex items-center text-xs font-medium text-zinc-600 dark:text-zinc-300">
+                        {day}
+                      </div>
+                      {peakHours.hours.map((hour, hourIndex) => {
+                        const minutes = peakHours.minutes[dayIndex]?.[hourIndex] ?? 0;
+                        return (
+                          <div
+                            key={`${day}-${hour}`}
+                            title={`${day} ${hourLabel(hour)}–${hourLabel(hour + 1)} · ${minutes}m booked`}
+                            className={cn(
+                              "h-8 rounded-sm border border-zinc-200/60 dark:border-zinc-800",
+                              minutes <= 0 && "bg-zinc-100 dark:bg-zinc-800",
+                            )}
+                            style={minutes > 0 ? { backgroundColor: heatColor(minutes) } : undefined}
+                          />
+                        );
+                      })}
+                    </div>
+                  ))}
                 </div>
-              ))}
-              {WEEKDAYS.map((day, dayIndex) => (
-                <div key={day} className="contents">
-                  <div className="flex items-center text-xs font-medium text-zinc-600 dark:text-zinc-300">
-                    {day}
-                  </div>
-                  {WORK_HOURS.map((hour, hourIndex) => {
-                    const minutes = snapshot.peakMinutes[dayIndex]?.[hourIndex] ?? 0;
-                    return (
-                      <div
-                        key={`${day}-${hour}`}
-                        title={`${day} ${hourLabel(hour)}–${hourLabel(hour + 1)} · ${minutes}m booked`}
-                        className={cn(
-                          "h-8 rounded-sm border border-zinc-200/60 dark:border-zinc-800",
-                          minutes <= 0 && "bg-zinc-100 dark:bg-zinc-800",
-                        )}
-                        style={minutes > 0 ? { backgroundColor: heatColor(minutes) } : undefined}
-                      />
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          </div>
-          <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
-            Busiest: {snapshot.busiest.day} · {snapshot.busiest.slot}
-          </p>
+              </div>
+              <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
+                {peakHours.busiest
+                  ? `Busiest: ${peakHours.busiest.day} · ${peakHours.busiest.slot}`
+                  : "No busy weekday hours"}
+              </p>
+            </>
+          )}
         </SectionCard>
 
         <SectionCard title="Most frequent events" subtitle="Repeating titles in this range" className="xl:col-span-4">
-          {frequent.length === 0 ? (
+          {chartLoading ? (
+            <LoadingState message="Loading schedule…" />
+          ) : frequent.length === 0 ? (
             <EmptyState icon={Repeat} message="No repeating events" />
           ) : (
             <ul className="space-y-3">
@@ -614,14 +420,16 @@ export default function AnalyticsPage() {
 
       <section className="grid gap-4 lg:grid-cols-12">
         <SectionCard title="Board snapshot" subtitle="Open work vs done" className="lg:col-span-4">
-          {boardTotal === 0 ? (
+          {boardLoading ? (
+            <LoadingState message="Loading tasks…" />
+          ) : boardTotal === 0 ? (
             <EmptyState icon={ClipboardList} message="No tasks yet" />
           ) : (
             <div className="space-y-3">
               {boardRows.map((row) => (
-                <div key={row.label} className="rounded-xl border border-zinc-200/80 p-3 dark:border-zinc-800">
+                <div key={row.status} className="rounded-xl border border-zinc-200/80 p-3 dark:border-zinc-800">
                   <div className="flex items-center justify-between gap-2 text-sm">
-                    <p className="text-zinc-600 dark:text-zinc-300">{row.label}</p>
+                    <p className="text-zinc-600 dark:text-zinc-300">{TASK_STATUS_LABELS[row.status]}</p>
                     <p className="font-semibold text-zinc-900 dark:text-zinc-100">{row.count}</p>
                   </div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
@@ -629,7 +437,7 @@ export default function AnalyticsPage() {
                       className="h-full rounded-full"
                       style={{
                         width: `${Math.round((row.count / boardTotal) * 100)}%`,
-                        backgroundColor: row.color,
+                        backgroundColor: BOARD_ROW_COLORS[row.status],
                       }}
                     />
                   </div>
@@ -640,13 +448,15 @@ export default function AnalyticsPage() {
         </SectionCard>
 
         <SectionCard title="Deadlines" subtitle="Overdue first, then the next 7 days" className="lg:col-span-4">
-          {deadlines.length === 0 ? (
-            <EmptyState icon={CalendarClock} message="No overdue tasks" />
+          {boardLoading ? (
+            <LoadingState message="Loading tasks…" />
+          ) : deadlines.length === 0 ? (
+            <EmptyState icon={CalendarClock} message="No overdue or upcoming deadlines" />
           ) : (
             <ul className="space-y-3">
               {deadlines.map((item) => (
                 <li
-                  key={item.task}
+                  key={item.id}
                   className="rounded-xl border border-zinc-200/80 p-3 transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:hover:border-zinc-700"
                 >
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -673,13 +483,15 @@ export default function AnalyticsPage() {
           subtitle="Open high-priority tasks with no calendar block"
           className="lg:col-span-4"
         >
-          {unscheduledHigh.length === 0 ? (
+          {boardLoading ? (
+            <LoadingState message="Loading tasks…" />
+          ) : unscheduledHigh.length === 0 ? (
             <EmptyState icon={ClipboardList} message="No unscheduled high-priority tasks" />
           ) : (
             <ul className="space-y-3">
               {unscheduledHigh.map((item) => (
                 <li
-                  key={item.task}
+                  key={item.id}
                   className="rounded-xl border border-zinc-200/80 p-3 dark:border-zinc-800"
                 >
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -699,23 +511,34 @@ export default function AnalyticsPage() {
 
       <SectionCard
         title="Average tasks per day"
-        subtitle={`Task-linked blocks only · avg ${snapshot.avgTasksPerWorkday} / workday · ${range}`}
+        subtitle={`Task-linked blocks only · avg ${taskBlocks.avgTasksPerWorkday} / workday · ${range}`}
       >
-        <div className="h-56">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={snapshot.tasksByDay}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" />
-              <XAxis dataKey="day" tickLine={false} axisLine={false} />
-              <YAxis tickLine={false} axisLine={false} width={28} allowDecimals={false} />
-              <Tooltip
-                cursor={{ fill: "rgba(15, 23, 42, 0.05)" }}
-                contentStyle={{ borderRadius: 12, borderColor: "#e4e4e7", fontSize: 12 }}
-                formatter={(value) => [`${Number(value ?? 0)}`, "Task blocks"]}
-              />
-              <Bar dataKey="tasks" fill="#0f766e" radius={[6, 6, 0, 0]} maxBarSize={48} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        {chartLoading ? (
+          <LoadingState message="Loading schedule…" />
+        ) : taskBarsEmpty ? (
+          <EmptyState icon={ClipboardList} message="No task blocks in this range" />
+        ) : (
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={taskBlocks.tasksByDay}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" />
+                <XAxis dataKey="day" tickLine={false} axisLine={false} />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  width={28}
+                  allowDecimals={taskBarsAllowDecimals}
+                />
+                <Tooltip
+                  cursor={{ fill: "rgba(15, 23, 42, 0.05)" }}
+                  contentStyle={{ borderRadius: 12, borderColor: "#e4e4e7", fontSize: 12 }}
+                  formatter={(value) => [`${Number(value ?? 0)}`, "Task blocks"]}
+                />
+                <Bar dataKey="tasks" fill="#0f766e" radius={[6, 6, 0, 0]} maxBarSize={48} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </SectionCard>
     </div>
   );

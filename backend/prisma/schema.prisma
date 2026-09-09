@@ -78,8 +78,11 @@ model GoogleCalendarIntegration {
   accessTokenExpiresAt  DateTime?
   connectedAt           DateTime  @default(now())
   lastSyncedAt          DateTime?
+  googleSyncToken       String?
   syncDaysBack          Int       @default(30)
   syncDaysForward       Int       @default(90)
+  exportEventraEvents   Boolean   @default(false)
+  pendingOverlapNotices Json      @default("[]")
   updatedAt             DateTime  @updatedAt
 }
 

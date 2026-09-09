@@ -3,14 +3,22 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  useAcknowledgeGoogleCalendarOverlapsMutation,
+  useGoogleCalendarStatusQuery,
+} from "@/hooks/use-google-calendar";
+import { formatOverlapNames } from "@/lib/event-overlap";
 import { cn } from "@/lib/utils";
 import {
+  appendNotifications,
+  loadNotifications,
   loadReminders,
+  NOTIFICATIONS_CHANGED_EVENT,
   reminderUid,
+  saveNotifications,
   saveReminders,
   type StoredNotification,
   type StoredReminder,
-  NOTIF_KEY,
 } from "@/lib/reminder-storage";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -29,25 +37,11 @@ dayjs.extend(relativeTime);
 
 function readInitialNotifications(): StoredNotification[] {
   if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(NOTIF_KEY);
-    if (!raw) {
-      const seeded = seedNotifications();
-      window.localStorage.setItem(NOTIF_KEY, JSON.stringify(seeded));
-      return seeded;
-    }
-    const parsed = JSON.parse(raw) as StoredNotification[];
-    if (!Array.isArray(parsed)) {
-      const seeded = seedNotifications();
-      window.localStorage.setItem(NOTIF_KEY, JSON.stringify(seeded));
-      return seeded;
-    }
-    return parsed;
-  } catch {
-    const seeded = seedNotifications();
-    window.localStorage.setItem(NOTIF_KEY, JSON.stringify(seeded));
-    return seeded;
-  }
+  const existing = loadNotifications();
+  if (existing.length > 0) return existing;
+  const seeded = seedNotifications();
+  saveNotifications(seeded);
+  return seeded;
 }
 
 function seedNotifications(): StoredNotification[] {
@@ -61,10 +55,6 @@ function seedNotifications(): StoredNotification[] {
       kind: "system",
     },
   ];
-}
-
-function saveNotifs(items: StoredNotification[]) {
-  window.localStorage.setItem(NOTIF_KEY, JSON.stringify(items));
 }
 
 type Tab = "notifications" | "reminders";
@@ -84,6 +74,11 @@ export function NotificationsCenter({ className }: { className?: string }) {
   );
 
   const titleId = useId();
+  const calendarStatusQuery = useGoogleCalendarStatusQuery();
+  const ackOverlapsMutation = useAcknowledgeGoogleCalendarOverlapsMutation();
+  const ackingOverlaps = useRef(false);
+  const pendingOverlaps = calendarStatusQuery.data?.pendingOverlaps;
+  const pendingOverlapKey = pendingOverlaps?.map((notice) => notice.id).join("|") ?? "";
 
   /* hydrate inbox from localStorage (client-only source) */
   useLayoutEffect(() => {
@@ -92,6 +87,32 @@ export function NotificationsCenter({ className }: { className?: string }) {
     setReminders(loadReminders());
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
+
+  useEffect(() => {
+    const refresh = () => setNotifications(loadNotifications());
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, refresh);
+    return () => {
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, refresh);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!pendingOverlapKey || !pendingOverlaps?.length || ackingOverlaps.current) {
+      return;
+    }
+    appendNotifications(
+      pendingOverlaps.map((notice) => ({
+        id: notice.id,
+        title: "Schedule overlap",
+        body: `${notice.title} overlaps ${formatOverlapNames(notice.overlappingTitles)}.`,
+        kind: "overlap",
+      })),
+    );
+    ackingOverlaps.current = true;
+    void ackOverlapsMutation.mutateAsync().finally(() => {
+      ackingOverlaps.current = false;
+    });
+  }, [pendingOverlapKey, pendingOverlaps, ackOverlapsMutation]);
 
   useEffect(() => {
     if (!open) return;
@@ -132,7 +153,7 @@ export function NotificationsCenter({ className }: { className?: string }) {
 
     setNotifications((prevN) => {
       const merged = [...extras, ...prevN];
-      saveNotifs(merged);
+      saveNotifications(merged);
       return merged;
     });
   }, []);
@@ -160,7 +181,7 @@ export function NotificationsCenter({ className }: { className?: string }) {
 
   const persistNotifs = useCallback((next: StoredNotification[]) => {
     setNotifications(next);
-    saveNotifs(next);
+    saveNotifications(next);
   }, []);
 
   const persistReminders = useCallback((next: StoredReminder[]) => {
@@ -345,7 +366,11 @@ export function NotificationsCenter({ className }: { className?: string }) {
                         ) : null}
                         <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
                           {dayjs(n.createdAt).fromNow()}
-                          {n.kind === "reminder" ? " · Reminder" : ""}
+                          {n.kind === "reminder"
+                            ? " · Reminder"
+                            : n.kind === "overlap"
+                              ? " · Overlap"
+                              : ""}
                         </p>
                       </div>
                       <div className="flex shrink-0 flex-col gap-0.5">

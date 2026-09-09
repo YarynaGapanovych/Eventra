@@ -1,7 +1,9 @@
 import { AppAuthGate } from "@/components/app-auth-gate";
 import { AppBottomNav } from "@/components/app-bottom-nav";
 import { AppSidebar } from "@/components/app-sidebar";
+import { FreeHostingWakeBanner } from "@/components/free-hosting-wake-banner";
 import { SiteHeader } from "@/components/site-header";
+import { GoogleCalendarLiveSync } from "@/hooks/use-google-calendar-live-sync";
 
 export default function AppLayout({
   children,
@@ -10,6 +12,7 @@ export default function AppLayout({
 }>) {
   return (
     <AppAuthGate>
+      <GoogleCalendarLiveSync />
       <div className="flex h-dvh w-full flex-col overflow-hidden bg-linear-to-br from-zinc-100 via-white to-teal-50/40 dark:from-zinc-950 dark:via-zinc-950 dark:to-teal-950/20">
         <SiteHeader />
 
@@ -17,6 +20,7 @@ export default function AppLayout({
           <AppSidebar />
 
           <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto p-4 sm:p-6 md:p-8">
+            <FreeHostingWakeBanner />
             {children}
           </main>
         </div>

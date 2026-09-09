@@ -4,6 +4,7 @@ import { GoogleCalendarSyncSection } from "@/components/google-calendar-sync-sec
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   useUpdateUserSettingsMutation,
   useUserSettingsQuery,
@@ -21,6 +22,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
+import { toast } from "sonner";
 import { z } from "zod/v3";
 
 const TIME_HM = /^(?:[01]?[0-9]|2[0-3]):[0-5][0-9]$/;
@@ -78,7 +80,7 @@ export function SettingsPanel() {
     mode: "onChange",
   });
 
-  const { register, handleSubmit, reset, formState } = form;
+  const { register, handleSubmit, reset, setValue, formState } = form;
 
   const workdayStart = useWatch({
     control: form.control,
@@ -88,6 +90,10 @@ export function SettingsPanel() {
   const defaultEventDurationMinutes = useWatch({
     control: form.control,
     name: "defaultEventDurationMinutes",
+  });
+  const showPastDoneTaskEvents = useWatch({
+    control: form.control,
+    name: "showPastDoneTaskEvents",
   });
 
   useEffect(() => {
@@ -137,6 +143,11 @@ export function SettingsPanel() {
         ? "Could not load settings."
         : null;
   const displayError = saveError ?? loadError;
+
+  useEffect(() => {
+    if (!displayError) return;
+    toast.error(displayError, { id: "settings-error" });
+  }, [displayError]);
 
   async function onSubmit(values: SettingsFormValues) {
     if (!signedIn) return;
@@ -279,17 +290,26 @@ export function SettingsPanel() {
             Future blocks of a done task are always removed so the slot is free.
             Choose whether past blocks stay visible.
           </p>
-          <label className="mt-4 flex items-start gap-3 text-sm text-zinc-800 dark:text-zinc-200">
-            <input
-              type="checkbox"
-              className="mt-0.5 size-4 rounded border-zinc-300 text-teal-600 focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+          <div className="mt-4 flex items-start gap-3">
+            <Switch
+              id="show-past-done-task-events"
+              className="mt-0.5"
+              checked={showPastDoneTaskEvents}
               disabled={fieldsDisabled}
-              {...register("showPastDoneTaskEvents")}
+              onCheckedChange={(checked) =>
+                setValue("showPastDoneTaskEvents", checked, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+              }
             />
-            <span>
+            <Label
+              htmlFor="show-past-done-task-events"
+              className="text-sm font-medium text-zinc-800 dark:text-zinc-200"
+            >
               Show past calendar blocks for completed tasks
-            </span>
-          </label>
+            </Label>
+          </div>
         </section>
 
         <Suspense
@@ -337,12 +357,6 @@ export function SettingsPanel() {
             <Link href="/" className="font-medium underline underline-offset-2">
               Go to sign in
             </Link>
-          </p>
-        ) : null}
-
-        {displayError ? (
-          <p className="text-sm text-red-600 dark:text-red-400">
-            {displayError}
           </p>
         ) : null}
       </form>

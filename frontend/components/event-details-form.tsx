@@ -42,6 +42,7 @@ import {
   Video,
 } from "lucide-react";
 import { useEffect, useId, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { toast } from "sonner";
 
 const selectClass = cn(
   "flex h-8 w-full rounded-lg border border-zinc-200 bg-zinc-100 px-2.5 py-1 text-sm shadow-none outline-none",
@@ -347,6 +348,12 @@ export function EventDetailsForm({
   const [showConference, setShowConference] = useState(
     Boolean(values.conferenceUrl),
   );
+
+  useEffect(() => {
+    if (!error) return;
+    toast.error(error, { id: "event-form-error" });
+  }, [error]);
+
   const zones = useMemo(() => listTimeZones(values.timezone), [values.timezone]);
   const startDate = values.startDate
     ? new Date(`${values.startDate}T12:00:00`)
@@ -474,7 +481,7 @@ export function EventDetailsForm({
           <Checkbox
             checked={values.allDay}
             disabled={disabled}
-            onChange={(e) => patch({ allDay: e.target.checked })}
+            onCheckedChange={(checked) => patch({ allDay: checked === true })}
           />
           All day
         </label>
@@ -749,7 +756,9 @@ export function EventDetailsForm({
               <Checkbox
                 checked={values.guestCanModify}
                 disabled={disabled}
-                onChange={(e) => patch({ guestCanModify: e.target.checked })}
+                onCheckedChange={(checked) =>
+                  patch({ guestCanModify: checked === true })
+                }
               />
               Modify event
             </label>
@@ -757,7 +766,9 @@ export function EventDetailsForm({
               <Checkbox
                 checked={values.guestCanInvite}
                 disabled={disabled}
-                onChange={(e) => patch({ guestCanInvite: e.target.checked })}
+                onCheckedChange={(checked) =>
+                  patch({ guestCanInvite: checked === true })
+                }
               />
               Invite others
             </label>
@@ -765,8 +776,8 @@ export function EventDetailsForm({
               <Checkbox
                 checked={values.guestCanSeeOthers}
                 disabled={disabled}
-                onChange={(e) =>
-                  patch({ guestCanSeeOthers: e.target.checked })
+                onCheckedChange={(checked) =>
+                  patch({ guestCanSeeOthers: checked === true })
                 }
               />
               See guest list
@@ -774,12 +785,6 @@ export function EventDetailsForm({
           </div>
         </div>
       </div>
-
-      {error ? (
-        <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-          {error}
-        </p>
-      ) : null}
 
       <div className="flex items-center justify-between gap-3 pt-2">
         {onDelete && !readOnly ? (
