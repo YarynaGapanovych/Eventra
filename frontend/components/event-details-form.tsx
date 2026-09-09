@@ -481,7 +481,7 @@ export function EventDetailsForm({
           <Checkbox
             checked={values.allDay}
             disabled={disabled}
-            onChange={(e) => patch({ allDay: e.target.checked })}
+            onCheckedChange={(checked) => patch({ allDay: checked === true })}
           />
           All day
         </label>
@@ -756,7 +756,9 @@ export function EventDetailsForm({
               <Checkbox
                 checked={values.guestCanModify}
                 disabled={disabled}
-                onChange={(e) => patch({ guestCanModify: e.target.checked })}
+                onCheckedChange={(checked) =>
+                  patch({ guestCanModify: checked === true })
+                }
               />
               Modify event
             </label>
@@ -764,7 +766,9 @@ export function EventDetailsForm({
               <Checkbox
                 checked={values.guestCanInvite}
                 disabled={disabled}
-                onChange={(e) => patch({ guestCanInvite: e.target.checked })}
+                onCheckedChange={(checked) =>
+                  patch({ guestCanInvite: checked === true })
+                }
               />
               Invite others
             </label>
@@ -772,8 +776,8 @@ export function EventDetailsForm({
               <Checkbox
                 checked={values.guestCanSeeOthers}
                 disabled={disabled}
-                onChange={(e) =>
-                  patch({ guestCanSeeOthers: e.target.checked })
+                onCheckedChange={(checked) =>
+                  patch({ guestCanSeeOthers: checked === true })
                 }
               />
               See guest list
