@@ -148,6 +148,7 @@ type GoogleCalendarOverlapNotice {
 type GoogleCalendarStatus {
   connected: Boolean!
   connectedAt: String
+  exportEventraEvents: Boolean!
   lastSyncedAt: String
   pendingOverlaps: [GoogleCalendarOverlapNotice!]!
   syncDaysBack: Int!
@@ -191,6 +192,7 @@ type Mutation {
   startGoogleCalendarConnect(input: StartGoogleCalendarConnectInput): GoogleCalendarConnectPayload!
   syncGoogleCalendar: GoogleCalendarSyncPayload!
   updateEvent(id: String!, input: UpdateEventInput!): Event!
+  updateGoogleCalendarExportSetting(exportEventraEvents: Boolean!): GoogleCalendarStatus!
   updateGoogleCalendarSyncWindow(input: UpdateGoogleCalendarSyncWindowInput!): GoogleCalendarStatus!
   updateTask(id: String!, input: UpdateTaskInput!): Task!
   updateUserSettings(input: UpdateUserSettingsInput!): UserSettings!

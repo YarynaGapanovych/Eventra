@@ -18,6 +18,7 @@ export type GoogleCalendarSyncState = {
   lastSyncedAt: string | null;
   syncDaysBack: number;
   syncDaysForward: number;
+  exportEventraEvents: boolean;
   pendingOverlaps: GoogleCalendarOverlapNotice[];
 };
 
@@ -27,6 +28,7 @@ export const googleCalendarDefaultState: GoogleCalendarSyncState = {
   lastSyncedAt: null,
   syncDaysBack: DEFAULT_SYNC_DAYS_BACK,
   syncDaysForward: DEFAULT_SYNC_DAYS_FORWARD,
+  exportEventraEvents: false,
   pendingOverlaps: [],
 };
 
@@ -82,6 +84,7 @@ export function normalizeGoogleCalendarStatus(
       SYNC_DAYS_FORWARD_PRESETS,
       DEFAULT_SYNC_DAYS_FORWARD,
     ),
+    exportEventraEvents: data.exportEventraEvents === true,
     pendingOverlaps: parseOverlapNotices(data.pendingOverlaps),
   };
 }

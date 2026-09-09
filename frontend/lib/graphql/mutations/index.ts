@@ -12,6 +12,7 @@ export { DISCONNECT_GOOGLE_CALENDAR_MUTATION } from "./disconnect-google-calenda
 export { SYNC_GOOGLE_CALENDAR_MUTATION } from "./sync-google-calendar";
 export { ACKNOWLEDGE_GOOGLE_CALENDAR_OVERLAPS_MUTATION } from "./acknowledge-google-calendar-overlaps";
 export { UPDATE_GOOGLE_CALENDAR_SYNC_WINDOW_MUTATION } from "./update-google-calendar-sync-window";
+export { UPDATE_GOOGLE_CALENDAR_EXPORT_SETTING_MUTATION } from "./update-google-calendar-export-setting";
 export { UPDATE_USER_SETTINGS_MUTATION } from "./update-user-settings";
 export { CREATE_EVENT_MUTATION } from "./create-event";
 export { UPDATE_EVENT_MUTATION } from "./update-event";

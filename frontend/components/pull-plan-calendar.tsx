@@ -601,12 +601,6 @@ function PullPlanCalendarView() {
     const matched =
       events.find((e) => e.id === payload.id) ??
       events.find((e) => e.id === parseMasterEventId(payload.id));
-    const source = matched?.source;
-    if (source === "google") {
-      const message = "Google Calendar events cannot be edited in Eventra.";
-      setActionError(message);
-      throw new Error(message);
-    }
 
     const taskId = unscheduledTaskId(payload.id);
     setActionError(null);

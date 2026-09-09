@@ -4,6 +4,7 @@ import {
   DISCONNECT_GOOGLE_CALENDAR_MUTATION,
   START_GOOGLE_CALENDAR_CONNECT_MUTATION,
   SYNC_GOOGLE_CALENDAR_MUTATION,
+  UPDATE_GOOGLE_CALENDAR_EXPORT_SETTING_MUTATION,
   UPDATE_GOOGLE_CALENDAR_SYNC_WINDOW_MUTATION,
 } from "@/lib/graphql/mutations";
 import { GOOGLE_CALENDAR_STATUS_QUERY } from "@/lib/graphql/queries";
@@ -119,5 +120,28 @@ export function useUpdateGoogleCalendarSyncWindowMutation() {
       );
     },
     onSuccess: invalidate,
+  });
+}
+
+export function useUpdateGoogleCalendarExportSettingMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (exportEventraEvents: boolean) => {
+      const data = await graphqlRequest<{
+        updateGoogleCalendarExportSetting: Partial<GoogleCalendarSyncState>;
+      }>(UPDATE_GOOGLE_CALENDAR_EXPORT_SETTING_MUTATION, {
+        exportEventraEvents,
+      });
+      return normalizeGoogleCalendarStatus(
+        data.updateGoogleCalendarExportSetting,
+      );
+    },
+    onSuccess: (next) => {
+      const token = useAuthStore.getState().token ?? "anon";
+      queryClient.setQueryData(
+        [...queryKeys.googleCalendarStatus, token],
+        next,
+      );
+    },
   });
 }

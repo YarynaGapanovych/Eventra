@@ -2,11 +2,13 @@
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   useDisconnectGoogleCalendarMutation,
   useGoogleCalendarStatusQuery,
   useStartGoogleCalendarConnectMutation,
   useSyncGoogleCalendarMutation,
+  useUpdateGoogleCalendarExportSettingMutation,
   useUpdateGoogleCalendarSyncWindowMutation,
 } from "@/hooks/use-google-calendar";
 import { getStoredAuth } from "@/lib/auth-api";
@@ -74,6 +76,7 @@ export function GoogleCalendarSyncSection() {
   const disconnectMutation = useDisconnectGoogleCalendarMutation();
   const syncMutation = useSyncGoogleCalendarMutation();
   const windowMutation = useUpdateGoogleCalendarSyncWindowMutation();
+  const exportMutation = useUpdateGoogleCalendarExportSettingMutation();
 
   const [error, setError] = useState<string | null>(null);
   const [oauthNotice, setOauthNotice] = useState<string | null>(null);
@@ -86,7 +89,8 @@ export function GoogleCalendarSyncSection() {
     connectMutation.isPending ||
     disconnectMutation.isPending ||
     syncMutation.isPending ||
-    windowMutation.isPending;
+    windowMutation.isPending ||
+    exportMutation.isPending;
   const busy = loading || syncing;
   const statusError =
     statusQuery.error instanceof Error
@@ -227,6 +231,28 @@ export function GoogleCalendarSyncSection() {
     }
   }
 
+  async function handleExportChange(exportEventraEvents: boolean) {
+    if (exportEventraEvents === state.exportEventraEvents) return;
+    if (!state.connected) return;
+
+    if (!resolveToken(useAuthStore.getState().token)) {
+      setError("Sign in to change Google Calendar settings.");
+      return;
+    }
+
+    setError(null);
+    setOauthNotice(null);
+    try {
+      await exportMutation.mutateAsync(exportEventraEvents);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not update Google Calendar export setting.",
+      );
+    }
+  }
+
   const lastSyncedLabel = formatWhen(state.lastSyncedAt);
   const connectedAtLabel = formatWhen(state.connectedAt);
 
@@ -237,8 +263,8 @@ export function GoogleCalendarSyncSection() {
       </h2>
       <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
         {state.connected
-          ? "Your Google Calendar is linked to Eventra. Sync to import events, or reconnect to refresh access."
-          : "Connect your Google account to import events from your primary Google Calendar into Eventra."}
+          ? "Your Google Calendar is linked to Eventra. Sync to import events, add new Eventra events to Google Calendar, or reconnect to refresh access."
+          : "Connect your Google account to import events from your primary Google Calendar into Eventra, and optionally add new Eventra events to Google."}
       </p>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -291,6 +317,30 @@ export function GoogleCalendarSyncSection() {
         {state.syncDaysBack} days ago through {state.syncDaysForward} days
         ahead.
       </p>
+
+      <div className="mt-4 flex items-start gap-3">
+        <Switch
+          id="google-export-eventra-events"
+          className="mt-0.5"
+          checked={state.exportEventraEvents}
+          disabled={busy || !state.connected || !signedIn}
+          onCheckedChange={(checked) =>
+            void handleExportChange(checked)
+          }
+        />
+        <div className="min-w-0">
+          <Label
+            htmlFor="google-export-eventra-events"
+            className="text-sm font-medium text-zinc-800 dark:text-zinc-200"
+          >
+            Add new Eventra events to Google Calendar
+          </Label>
+          <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
+            New events (including scheduled tasks) are added to your primary
+            Google Calendar. Existing Eventra events are left as-is.
+          </p>
+        </div>
+      </div>
 
       {!signedIn && !loading && !authPending ? (
         <p className="mt-4 text-sm text-amber-700 dark:text-amber-400">

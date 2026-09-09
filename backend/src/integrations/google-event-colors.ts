@@ -59,3 +59,12 @@ export function resolveGoogleEventColor(
     : null;
   return fromId ?? toGoogleDisplayColor(calendarColor) ?? calendarColor;
 }
+
+export function hexToGoogleColorId(value?: string | null): string | null {
+  const hex = normalizeHexColor(value);
+  if (!hex) return null;
+  for (const [id, color] of Object.entries(GOOGLE_EVENT_COLORS)) {
+    if (color.toUpperCase() === hex) return id;
+  }
+  return null;
+}

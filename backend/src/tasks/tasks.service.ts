@@ -8,11 +8,14 @@ import {
   TaskBoardStatus,
   TaskPriority,
 } from '../generated/prisma/client';
+import {
+  GoogleCalendarWriteService,
+  toGoogleWriteEvent,
+} from '../integrations/google-calendar-write.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateTaskInput, Task, UpdateTaskInput } from './task.types';
 import {
   calendarScalarData,
-  EVENT_DETAIL_INCLUDE,
   guestCreateData,
   nestedGuestReminderCreate,
   parseIsoDate,
@@ -22,12 +25,16 @@ import {
   toEventDto,
   toGuestDtos,
   toReminderDtos,
+  type EventWithDetails,
   type TaskWithDetails,
 } from '../calendar/calendar-fields';
 
 @Injectable()
 export class TasksService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly googleWrite: GoogleCalendarWriteService,
+  ) {}
 
   async listForUser(userId: string): Promise<Task[]> {
     const rows = await this.prisma.task.findMany({
@@ -83,7 +90,24 @@ export class TasksService {
       });
     });
 
-    return this.toDto(created);
+    const createdEvent = created.events.find(
+      (event) => event.source === EventSource.eventra,
+    );
+    if (createdEvent) {
+      try {
+        await this.attachGoogleCopy(userId, createdEvent);
+      } catch (err) {
+        await this.prisma.task.delete({ where: { id: created.id } });
+        throw err;
+      }
+    }
+
+    return this.toDto(
+      await this.prisma.task.findFirstOrThrow({
+        where: { id: created.id },
+        include: TASK_DETAIL_INCLUDE,
+      }),
+    );
   }
 
   async updateForUser(
@@ -125,6 +149,21 @@ export class TasksService {
     }
 
     const calendar = calendarScalarData(input);
+
+    if (
+      nextStatus === TaskBoardStatus.done &&
+      existing.status !== TaskBoardStatus.done
+    ) {
+      await this.deleteGoogleCopies(
+        userId,
+        await this.prisma.event.findMany({
+          where: { taskId: id, start: { gte: new Date() } },
+          select: { googleEventId: true },
+        }),
+      );
+    }
+
+    let createdEventId: string | null = null;
 
     const updated = await this.prisma.$transaction(async (tx) => {
       if (
@@ -211,7 +250,7 @@ export class TasksService {
         eventraEvents.length === 0 &&
         nextStatus !== TaskBoardStatus.done
       ) {
-        await tx.event.create({
+        const createdEvent = await tx.event.create({
           data: {
             userId,
             title: nextName,
@@ -256,6 +295,7 @@ export class TasksService {
             },
           },
         });
+        createdEventId = createdEvent.id;
       }
 
       return tx.task.findFirstOrThrow({
@@ -264,7 +304,34 @@ export class TasksService {
       });
     });
 
-    return this.toDto(updated);
+    const createdEvent = createdEventId
+      ? updated.events.find((event) => event.id === createdEventId)
+      : undefined;
+    if (createdEvent) {
+      try {
+        await this.attachGoogleCopy(userId, createdEvent);
+      } catch (err) {
+        await this.prisma.event.delete({ where: { id: createdEvent.id } });
+        throw err;
+      }
+    }
+
+    for (const event of updated.events) {
+      if (event.id === createdEventId) continue;
+      if (event.source !== EventSource.eventra || !event.googleEventId) continue;
+      await this.googleWrite.patchEvent(
+        userId,
+        event.googleEventId,
+        toGoogleWriteEvent(event),
+      );
+    }
+
+    return this.toDto(
+      await this.prisma.task.findFirstOrThrow({
+        where: { id },
+        include: TASK_DETAIL_INCLUDE,
+      }),
+    );
   }
 
   async deleteForUser(userId: string, id: string): Promise<boolean> {
@@ -274,8 +341,40 @@ export class TasksService {
     if (!existing) {
       throw new NotFoundException('Task not found');
     }
+    await this.deleteGoogleCopies(
+      userId,
+      await this.prisma.event.findMany({
+        where: { taskId: existing.id },
+        select: { googleEventId: true },
+      }),
+    );
     await this.prisma.task.delete({ where: { id: existing.id } });
     return true;
+  }
+
+  private async attachGoogleCopy(
+    userId: string,
+    created: EventWithDetails,
+  ): Promise<void> {
+    const googleEventId = await this.googleWrite.createEventraCopyIfEnabled(
+      userId,
+      toGoogleWriteEvent(created),
+    );
+    if (!googleEventId) return;
+    await this.prisma.event.update({
+      where: { id: created.id },
+      data: { googleEventId },
+    });
+  }
+
+  private async deleteGoogleCopies(
+    userId: string,
+    events: { googleEventId: string | null }[],
+  ): Promise<void> {
+    for (const event of events) {
+      if (!event.googleEventId) continue;
+      await this.googleWrite.deleteEvent(userId, event.googleEventId);
+    }
   }
 
   private toDto(task: TaskWithDetails): Task {

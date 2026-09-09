@@ -68,6 +68,9 @@ export class GoogleCalendarStatus {
   @Field(() => Int)
   syncDaysForward!: number;
 
+  @Field()
+  exportEventraEvents!: boolean;
+
   @Field(() => [GoogleCalendarOverlapNotice])
   pendingOverlaps!: GoogleCalendarOverlapNotice[];
 }

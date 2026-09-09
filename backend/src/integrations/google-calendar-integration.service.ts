@@ -26,6 +26,7 @@ export type GoogleCalendarConnectionStatus = {
   lastSyncedAt: string | null;
   syncDaysBack: number;
   syncDaysForward: number;
+  exportEventraEvents: boolean;
   pendingOverlaps: CalendarOverlapNotice[];
 };
 
@@ -72,6 +73,7 @@ export class GoogleCalendarIntegrationService {
         lastSyncedAt: null,
         syncDaysBack: DEFAULT_SYNC_DAYS_BACK,
         syncDaysForward: DEFAULT_SYNC_DAYS_FORWARD,
+        exportEventraEvents: false,
         pendingOverlaps: [],
       };
     }
@@ -81,6 +83,7 @@ export class GoogleCalendarIntegrationService {
       lastSyncedAt: row.lastSyncedAt?.toISOString() ?? null,
       syncDaysBack: row.syncDaysBack,
       syncDaysForward: row.syncDaysForward,
+      exportEventraEvents: row.exportEventraEvents,
       pendingOverlaps: parseOverlapNotices(row.pendingOverlapNotices),
     };
   }
@@ -115,6 +118,33 @@ export class GoogleCalendarIntegrationService {
     await this.prisma.googleCalendarIntegration.update({
       where: { userId },
       data: { syncDaysBack, syncDaysForward },
+    });
+
+    return this.getStatus(userId);
+  }
+
+  async isExportEnabled(userId: string): Promise<boolean> {
+    const row = await this.prisma.googleCalendarIntegration.findUnique({
+      where: { userId },
+      select: { exportEventraEvents: true },
+    });
+    return row?.exportEventraEvents === true;
+  }
+
+  async updateExportSetting(
+    userId: string,
+    exportEventraEvents: boolean,
+  ): Promise<GoogleCalendarConnectionStatus> {
+    const row = await this.prisma.googleCalendarIntegration.findUnique({
+      where: { userId },
+    });
+    if (!row) {
+      throw new BadRequestException('Google Calendar is not connected');
+    }
+
+    await this.prisma.googleCalendarIntegration.update({
+      where: { userId },
+      data: { exportEventraEvents },
     });
 
     return this.getStatus(userId);
@@ -241,6 +271,11 @@ export class GoogleCalendarIntegrationService {
     }
 
     await this.prisma.googleCalendarIntegration.delete({ where: { userId } });
+
+    await this.prisma.event.updateMany({
+      where: { userId, source: EventSource.eventra, googleEventId: { not: null } },
+      data: { googleEventId: null },
+    });
 
     await this.prisma.event.deleteMany({
       where: { userId, source: EventSource.google },

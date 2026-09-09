@@ -91,4 +91,16 @@ export class GoogleCalendarResolver {
       clampSyncDaysForward(input.syncDaysForward),
     );
   }
+
+  @Mutation(() => GoogleCalendarStatus)
+  updateGoogleCalendarExportSetting(
+    @CurrentUser() user: JwtUser,
+    @Args('exportEventraEvents', { type: () => Boolean })
+    exportEventraEvents: boolean,
+  ): Promise<GoogleCalendarStatus> {
+    return this.integrationService.updateExportSetting(
+      user.userId,
+      exportEventraEvents,
+    );
+  }
 }
