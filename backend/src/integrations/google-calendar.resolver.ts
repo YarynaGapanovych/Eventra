@@ -63,12 +63,17 @@ export class GoogleCalendarResolver {
   @Mutation(() => GoogleCalendarSyncPayload)
   async syncGoogleCalendar(
     @CurrentUser() user: JwtUser,
+    @Args('incremental', { type: () => Boolean, nullable: true })
+    incremental?: boolean,
   ): Promise<GoogleCalendarSyncPayload> {
-    const result = await this.syncService.syncForUser(user.userId);
+    const result = await this.syncService.syncForUser(user.userId, {
+      incremental: incremental === true,
+    });
     return {
       ok: true,
       syncedAt: result.syncedAt,
       imported: result.imported,
+      changed: result.changed,
       overlaps: result.overlaps,
     };
   }

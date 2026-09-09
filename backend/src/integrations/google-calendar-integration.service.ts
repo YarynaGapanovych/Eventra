@@ -90,7 +90,12 @@ export class GoogleCalendarIntegrationService {
 
   async getSyncWindow(
     userId: string,
-  ): Promise<{ syncDaysBack: number; syncDaysForward: number }> {
+  ): Promise<{
+    syncDaysBack: number;
+    syncDaysForward: number;
+    googleSyncToken: string | null;
+    lastSyncedAt: Date | null;
+  }> {
     const row = await this.prisma.googleCalendarIntegration.findUnique({
       where: { userId },
     });
@@ -100,6 +105,8 @@ export class GoogleCalendarIntegrationService {
     return {
       syncDaysBack: row.syncDaysBack,
       syncDaysForward: row.syncDaysForward,
+      googleSyncToken: row.googleSyncToken,
+      lastSyncedAt: row.lastSyncedAt,
     };
   }
 
@@ -117,10 +124,25 @@ export class GoogleCalendarIntegrationService {
 
     await this.prisma.googleCalendarIntegration.update({
       where: { userId },
-      data: { syncDaysBack, syncDaysForward },
+      data: { syncDaysBack, syncDaysForward, googleSyncToken: null },
     });
 
     return this.getStatus(userId);
+  }
+
+  async persistSyncMeta(
+    userId: string,
+    data: { lastSyncedAt: Date; googleSyncToken?: string | null },
+  ): Promise<void> {
+    await this.prisma.googleCalendarIntegration.update({
+      where: { userId },
+      data: {
+        lastSyncedAt: data.lastSyncedAt,
+        ...(data.googleSyncToken !== undefined
+          ? { googleSyncToken: data.googleSyncToken }
+          : {}),
+      },
+    });
   }
 
   async isExportEnabled(userId: string): Promise<boolean> {

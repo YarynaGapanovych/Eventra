@@ -1,4 +1,4 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
 
@@ -103,11 +103,7 @@ export class GoogleOAuthService {
 
     const data = (await res.json()) as GoogleTokenResponse;
     if (!res.ok || !data.access_token) {
-      throw new Error(
-        data.error_description?.trim() ||
-          data.error ||
-          'Failed to refresh Google access token',
-      );
+      throw new BadRequestException(this.refreshErrorMessage(data));
     }
 
     return {
@@ -117,6 +113,17 @@ export class GoogleOAuthService {
       scope: data.scope ?? null,
       tokenType: data.token_type ?? null,
     };
+  }
+
+  private refreshErrorMessage(data: GoogleTokenResponse): string {
+    if (data.error === 'invalid_grant') {
+      return 'Google Calendar access expired. Disconnect and reconnect Google Calendar in Settings.';
+    }
+    return (
+      data.error_description?.trim() ||
+      data.error ||
+      'Failed to refresh Google access token'
+    );
   }
 
   async revokeToken(token: string): Promise<void> {

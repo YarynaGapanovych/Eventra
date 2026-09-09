@@ -79,7 +79,7 @@ export function useSyncGoogleCalendarMutation() {
     mutationFn: async () => {
       const data = await graphqlRequest<{
         syncGoogleCalendar: { syncedAt?: string };
-      }>(SYNC_GOOGLE_CALENDAR_MUTATION);
+      }>(SYNC_GOOGLE_CALENDAR_MUTATION, { incremental: false });
       return (
         data.syncGoogleCalendar.syncedAt ?? new Date().toISOString()
       );

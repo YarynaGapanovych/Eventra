@@ -156,6 +156,7 @@ type GoogleCalendarStatus {
 }
 
 type GoogleCalendarSyncPayload {
+  changed: Boolean!
   imported: Int!
   ok: Boolean!
   overlaps: [GoogleCalendarOverlapNotice!]!
@@ -190,7 +191,7 @@ type Mutation {
   resetPassword(input: ResetPasswordInput!): Boolean!
   scheduleTask(input: ScheduleTaskInput!): Event!
   startGoogleCalendarConnect(input: StartGoogleCalendarConnectInput): GoogleCalendarConnectPayload!
-  syncGoogleCalendar: GoogleCalendarSyncPayload!
+  syncGoogleCalendar(incremental: Boolean): GoogleCalendarSyncPayload!
   updateEvent(id: String!, input: UpdateEventInput!): Event!
   updateGoogleCalendarExportSetting(exportEventraEvents: Boolean!): GoogleCalendarStatus!
   updateGoogleCalendarSyncWindow(input: UpdateGoogleCalendarSyncWindowInput!): GoogleCalendarStatus!

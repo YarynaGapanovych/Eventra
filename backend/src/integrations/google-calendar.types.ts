@@ -92,6 +92,9 @@ export class GoogleCalendarSyncPayload {
   @Field(() => Int)
   imported!: number;
 
+  @Field()
+  changed!: boolean;
+
   @Field(() => [GoogleCalendarOverlapNotice])
   overlaps!: GoogleCalendarOverlapNotice[];
 }

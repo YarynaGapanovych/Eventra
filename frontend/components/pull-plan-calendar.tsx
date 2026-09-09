@@ -8,11 +8,6 @@ import {
   useEventCreateDraft,
 } from "@/components/event-create-color-context";
 import { Button } from "@/components/ui/button";
-import { getStoredAuth } from "@/lib/auth-api";
-import {
-  useGoogleCalendarStatusQuery,
-  useSyncGoogleCalendarMutation,
-} from "@/hooks/use-google-calendar";
 import {
   useCreateEventMutation,
   useEventsQuery,
@@ -438,12 +433,9 @@ function PullPlanCalendarView() {
   } = useEventsQuery();
   const { isWaking, showNotice } = useApiWakeNotice();
   const calendarLoading = eventsPending || tasksPending;
-  const calendarStatusQuery = useGoogleCalendarStatusQuery();
-  const syncMutation = useSyncGoogleCalendarMutation();
   const createEventMutation = useCreateEventMutation();
   const updateEventMutation = useUpdateEventMutation();
   const scheduleTaskMutation = useScheduleTaskMutation();
-  const initialSyncStarted = useRef(false);
   const error =
     actionError ??
     (tasksError instanceof Error
@@ -461,19 +453,6 @@ function PullPlanCalendarView() {
     setView(readStoredCalendarView());
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
-
-  useEffect(() => {
-    const token = getStoredAuth()?.token;
-    const status = calendarStatusQuery.data;
-    if (!token || !status?.connected || status.lastSyncedAt) return;
-    if (initialSyncStarted.current) return;
-    initialSyncStarted.current = true;
-    void syncMutation.mutateAsync().catch((err: unknown) => {
-      setActionError(
-        err instanceof Error ? err.message : "Google Calendar sync failed",
-      );
-    });
-  }, [calendarStatusQuery.data, syncMutation]);
 
   useEffect(() => {
     if (!error) return;
