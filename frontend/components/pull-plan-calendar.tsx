@@ -58,7 +58,7 @@ import {
   useState,
   type RefObject,
 } from "react";
-import { createPortal, flushSync } from "react-dom";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 
 const calendarNavIconClass = "size-4 shrink-0";
@@ -116,9 +116,7 @@ function revealTodayInDayView(root: HTMLElement): void {
   const steps = dayjs().day();
   for (let i = 0; i < steps; i++) {
     if (dayViewNavTitle(root) === todayLabel) return;
-    flushSync(() => {
-      next.click();
-    });
+    next.click();
   }
 }
 
@@ -509,27 +507,38 @@ function PullPlanCalendarView() {
     [scheduledEvents],
   );
 
-  useLayoutEffect(() => {
+  useEffect(() => {
+    if (calendarLoading) return;
     const root = calendarRootRef.current;
     if (!root) return;
-    const selected = root.querySelector(
-      '[data-slot="segmented-control-option"][aria-selected="true"]',
-    );
-    const current = selected?.getAttribute("data-value");
-    if (current !== view) {
+
+    let clicks = 0;
+    const syncLibraryView = () => {
+      const dataView = root
+        .querySelector("[data-slot='calendar-content']")
+        ?.getAttribute("data-view");
+      if (dataView === view) {
+        if (view === "day") revealTodayInDayView(root);
+        return true;
+      }
+      if (clicks >= 3) return true;
       const button = root.querySelector(
         `[data-slot="segmented-control-option"][data-value="${view}"]`,
       );
       if (button instanceof HTMLElement) {
-        flushSync(() => {
-          button.click();
-        });
+        clicks += 1;
+        button.click();
       }
-    }
-    if (view === "day") {
-      revealTodayInDayView(root);
-    }
-  }, [view, calendarInstanceKey]);
+      return false;
+    };
+
+    if (syncLibraryView()) return;
+    const observer = new MutationObserver(() => {
+      if (syncLibraryView()) observer.disconnect();
+    });
+    observer.observe(root, { childList: true, subtree: true, attributes: true });
+    return () => observer.disconnect();
+  }, [view, calendarInstanceKey, calendarLoading]);
 
   async function handleEventCreate(payload: CalendarEventCreatePayload) {
     setActionError(null);
@@ -641,6 +650,25 @@ function PullPlanCalendarView() {
         view={view}
         calendarKey={calendarInstanceKey}
       />
+      {calendarLoading ? (
+        <div
+          className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-white/75 px-6 text-center backdrop-blur-[2px] dark:bg-zinc-950/70"
+          role="status"
+        >
+          <Loader2
+            className="size-6 animate-spin text-teal-700 dark:text-teal-400"
+            aria-hidden
+          />
+          <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100">
+            Loading calendar…
+          </p>
+          {showNotice ? (
+            <p className="max-w-md text-sm text-zinc-600 dark:text-zinc-400">
+              {FREE_HOSTING_WAKE_MESSAGE}
+            </p>
+          ) : null}
+        </div>
+      ) : (
       <Calendar
         key={calendarInstanceKey}
         showSwitcher={true}
@@ -685,6 +713,7 @@ function PullPlanCalendarView() {
         EventActionButton={CalendarEventActionButton}
         EventDetailModal={CalendarEventDetailModal}
       />
+      )}
       </div>
       <OverlapConfirmDialog
         open={overlapPrompt !== null}
@@ -693,25 +722,6 @@ function PullPlanCalendarView() {
         onCancel={() => settleOverlapPrompt(false)}
         onConfirm={() => settleOverlapPrompt(true)}
       />
-      {calendarLoading ? (
-        <div
-          className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-white/75 px-6 text-center backdrop-blur-[2px] dark:bg-zinc-950/70"
-          role="status"
-        >
-          <Loader2
-            className="size-6 animate-spin text-teal-700 dark:text-teal-400"
-            aria-hidden
-          />
-          <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100">
-            Loading calendar…
-          </p>
-          {showNotice ? (
-            <p className="max-w-md text-sm text-zinc-600 dark:text-zinc-400">
-              {FREE_HOSTING_WAKE_MESSAGE}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
       </div>
     </div>
   );
