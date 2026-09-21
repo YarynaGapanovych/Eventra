@@ -19,7 +19,9 @@ import {
   FREE_HOSTING_WAKE_MESSAGE,
   useApiWakeNotice,
 } from "@/hooks/use-api-wake-notice";
+import { useUserSettingsQuery } from "@/hooks/use-user-settings";
 import { parseMasterEventId } from "@/lib/calendar-details";
+import { DEFAULT_APP_SETTINGS } from "@/lib/app-settings";
 import {
   findOverlappingEvents,
   isOverlapConfirmCancelled,
@@ -27,14 +29,13 @@ import {
 } from "@/lib/event-overlap";
 import { type ApiEvent } from "@/lib/events-api";
 import {
-  eventContrastText,
   GOOGLE_EVENT_COLOR_FALLBACK,
   TASK_BLOCK_COLOR,
   toGoogleDisplayColor,
 } from "@/lib/event-colors";
 import { syncEntityReminders } from "@/lib/reminder-storage";
 import { type ApiTask } from "@/lib/tasks-api";
-import dayjs from "dayjs";
+import dayjs, { type Dayjs } from "dayjs";
 import { CalendarPlus, ChevronLeft, ChevronRight, Eye, Loader2 } from "lucide-react";
 import {
   Calendar,
@@ -73,6 +74,9 @@ const CALENDAR_VIEWS: readonly CalendarViewMode[] = [
   "month",
   "year",
 ];
+const MAX_EVENTS_PER_DAY = 4;
+const TODAY_BUTTON_CLASS_NAME =
+  "border-zinc-200 bg-white/70 text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100";
 
 function isCalendarViewMode(value: string): value is CalendarViewMode {
   return (CALENDAR_VIEWS as readonly string[]).includes(value);
@@ -93,30 +97,6 @@ function writeStoredCalendarView(view: CalendarViewMode): void {
     window.localStorage.setItem(CALENDAR_VIEW_STORAGE_KEY, view);
   } catch {
     /* ignore */
-  }
-}
-
-const DAY_TITLE_FORMAT = "dddd, MMM D, YYYY";
-
-function dayViewNavTitle(root: HTMLElement): string | null {
-  const title = root.querySelector(
-    '[data-slot="day-view-nav"] [data-slot="title"]',
-  );
-  return title?.textContent?.trim() || null;
-}
-
-function revealTodayInDayView(root: HTMLElement): void {
-  const todayLabel = dayjs().format(DAY_TITLE_FORMAT);
-  if (dayViewNavTitle(root) === todayLabel) return;
-  const next = root.querySelector(
-    '[data-slot="day-view"] [aria-label="Next day"]',
-  );
-  if (!(next instanceof HTMLElement)) return;
-
-  const steps = dayjs().day();
-  for (let i = 0; i < steps; i++) {
-    if (dayViewNavTitle(root) === todayLabel) return;
-    next.click();
   }
 }
 
@@ -166,6 +146,280 @@ const DAY_WEEK_ADD_EVENT_CSS = `
 [data-slot="week-day-add-event"]:hover {
   color: #b1724b;
 }
+[data-slot="day-view-nav"] [data-slot="today-button"],
+[data-slot="week-view-nav"] [data-slot="today-button"] {
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.25;
+  color: #52525b;
+}
+.dark [data-slot="day-view-nav"] [data-slot="today-button"],
+.dark [data-slot="week-view-nav"] [data-slot="today-button"] {
+  border-color: #3f3f46;
+  color: #a1a1aa;
+}
+[data-slot="month-view-body"] {
+  padding: 0;
+}
+[data-slot="month-view-weekdays"] {
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  margin-bottom: 0.5rem;
+  border-bottom: none;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #71717a;
+}
+[data-slot="month-view-weeks"] {
+  gap: 0.5rem;
+  border: none;
+  border-radius: 0;
+  overflow: visible;
+}
+[data-slot="month-week"] {
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  min-height: 7.5rem;
+}
+[data-slot="month-view"] [data-slot="month-week-go-week"] {
+  display: none;
+}
+[data-slot="month-view"] [data-slot="week-days"] {
+  gap: 0.5rem;
+  height: 100%;
+  min-height: 7.5rem;
+}
+[data-slot="month-view"] [data-slot="week-day-cell"] {
+  align-items: stretch;
+  justify-content: flex-start;
+  overflow: hidden;
+  min-width: 0;
+  padding: 0.5rem 0.5rem 0.45rem;
+  background: white;
+  border: 1px solid #f3f4f6;
+  border-radius: 1rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  color: #374151;
+}
+[data-slot="month-view"] [data-slot="week-day-spacer"] {
+  min-width: 0;
+  border: 1px solid #f3f4f6;
+  border-radius: 1rem;
+  background: #fafafa;
+  box-shadow: none;
+}
+[data-slot="month-view"] [data-slot="week-day"] {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  padding: 0.05rem 0.15rem;
+  text-align: center;
+  cursor: default;
+}
+[data-slot="month-view"] [data-slot="week-day"] span {
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+[data-slot="month-view"] [data-slot="week-day"] button {
+  opacity: 1;
+  padding: 0.25rem;
+  width: auto;
+  height: auto;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #d18f60;
+  line-height: 1;
+}
+[data-slot="month-view"] [data-slot="week-day"] button:hover {
+  color: #b1724b;
+}
+[data-slot="month-view"] [data-slot="week-day-events"] {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  margin-top: 0.25rem;
+  gap: 0.125rem;
+}
+[data-slot="month-view"] [data-slot="week-day-events"] [data-slot="event"],
+[data-slot="month-view"] [data-slot="day-more-item"] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 2rem;
+  padding: 0.25rem 0.5rem;
+  border: none !important;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1.25;
+  font-weight: 500;
+  color: #fff !important;
+  background: var(--event-color, #b1724b);
+  background-image: none;
+}
+[data-slot="month-view"] [data-slot="week-day-events"] [data-slot="event"]:not([data-color]),
+[data-slot="month-view"] [data-slot="day-more-item"]:not([data-color]) {
+  background-color: #b1724b !important;
+}
+[data-slot="month-view"] [data-slot="week-day-events"] [data-slot="event"] > span,
+[data-slot="month-view"] [data-slot="day-more-item"] > span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-slot="month-view"] [data-slot="week-day-events"] [data-slot="event"] button {
+  flex-shrink: 0;
+  height: auto !important;
+  min-height: 0 !important;
+  width: auto;
+  gap: 0 !important;
+  padding: 0.2rem !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: inherit !important;
+  cursor: pointer;
+  font-size: 0 !important;
+  opacity: 0.9;
+}
+[data-slot="month-view"] [data-slot="week-day-events"] [data-slot="event"] button svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+[data-slot="month-view"] [data-slot="day-more-wrap"] {
+  width: 100%;
+  min-width: 0;
+}
+[data-slot="month-view"] [data-slot="day-more"] {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #52525b;
+  font-weight: 500;
+}
+[data-slot="year-view"] [data-slot="week-day-cell"] {
+  align-items: stretch;
+  justify-content: flex-start;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+  padding: 0.05rem;
+  background: transparent;
+  border: none;
+  border-right: 1px solid #e4e4e7;
+  border-radius: 0;
+  box-shadow: none;
+  color: #3f3f46;
+}
+[data-slot="year-view"] [data-slot="week-day-cell"]:last-child {
+  border-right: none;
+}
+[data-slot="year-view"] [data-slot="week-day-spacer"] {
+  min-width: 0;
+  border-right: 1px solid #e4e4e7;
+  background: #fafafa;
+}
+[data-slot="year-view"] [data-slot="week-day-spacer"]:last-child {
+  border-right: none;
+}
+[data-slot="year-view"] [data-slot="week-day"] {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.05rem 0.15rem;
+  text-align: left;
+  cursor: default;
+}
+[data-slot="year-view"] [data-slot="week-day"] span {
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+[data-slot="year-view"] [data-slot="week-day-events"] {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  margin-top: 0.1rem;
+  gap: 0.1rem;
+}
+[data-slot="year-view"] [data-slot="week-day-events"] [data-slot="event"],
+[data-slot="year-view"] [data-slot="day-more-item"] {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 0.15rem;
+  border: none !important;
+  border-radius: 0.2rem;
+  font-size: 0.5rem;
+  line-height: 1.25;
+  font-weight: 500;
+  color: #18181b;
+  background-image: linear-gradient(
+    rgb(255 255 255 / 0.58),
+    rgb(255 255 255 / 0.58)
+  );
+}
+.dark [data-slot="month-view-weekdays"] {
+  color: #a1a1aa;
+}
+.dark [data-slot="month-view"] [data-slot="week-day-cell"] {
+  background: #18181b;
+  border-color: #3f3f46;
+  color: #e4e4e7;
+}
+.dark [data-slot="month-view"] [data-slot="week-day-spacer"] {
+  background: #18181b;
+  border-color: #3f3f46;
+}
+.dark [data-slot="month-view"] [data-slot="week-day"] button {
+  color: #d18f60;
+}
+.dark [data-slot="month-view"] [data-slot="day-more"] {
+  color: #a1a1aa;
+}
+.dark [data-slot="month-view"] [data-slot="week-day-events"] [data-slot="event"],
+.dark [data-slot="month-view"] [data-slot="day-more-item"] {
+  color: #fafafa;
+  background-image: none;
+}
+.dark [data-slot="year-view"] [data-slot="week-day-cell"],
+.dark [data-slot="year-view"] [data-slot="week-day-spacer"] {
+  border-right-color: #3f3f46;
+  color: #e4e4e7;
+}
+.dark [data-slot="year-view"] [data-slot="week-day-spacer"] {
+  background: #18181b;
+}
+.dark [data-slot="year-view"] [data-slot="week-day-events"] [data-slot="event"],
+.dark [data-slot="year-view"] [data-slot="day-more-item"] {
+  color: #fafafa;
+  background-image: linear-gradient(
+    rgb(24 24 27 / 0.38),
+    rgb(24 24 27 / 0.38)
+  );
+}
 `.trim();
 
 function CalendarAddEventButton({ onClick }: { onClick: () => void }) {
@@ -210,39 +464,6 @@ function sameElements(a: Element[], b: Element[]): boolean {
   return a.length === b.length && a.every((el, i) => el === b[i]);
 }
 
-function applyUnscheduledCopy(root: HTMLElement | null) {
-  if (!root) return;
-
-  const title = root.querySelector('[data-slot="unscheduled-title"]');
-  if (title instanceof HTMLElement && title.textContent !== UNSCHEDULED_TITLE) {
-    title.textContent = UNSCHEDULED_TITLE;
-  }
-
-  const list = root.querySelector('[data-slot="unscheduled-list"]');
-  if (!(list instanceof HTMLElement)) return;
-
-  const hasItems =
-    list.querySelector('[data-slot="unscheduled-event"]') != null;
-  const hint = list.querySelector('[data-slot="unscheduled-hint"]');
-
-  if (!hasItems) {
-    if (hint) hint.remove();
-    return;
-  }
-
-  if (hint instanceof HTMLElement) {
-    if (hint.textContent !== UNSCHEDULED_HINT) {
-      hint.textContent = UNSCHEDULED_HINT;
-    }
-    return;
-  }
-
-  const inserted = document.createElement("p");
-  inserted.setAttribute("data-slot", "unscheduled-hint");
-  inserted.textContent = UNSCHEDULED_HINT;
-  list.appendChild(inserted);
-}
-
 function openLibraryCreateEvent(root: HTMLElement | null) {
   const button = root?.querySelector(
     '[data-slot="unscheduled-list"] [aria-label="Add event"], [data-slot="month-view-nav"] [data-slot="calendar-add-event"], [data-slot="year-view-nav"] [data-slot="calendar-add-event"]',
@@ -263,7 +484,6 @@ function CalendarAddEventOverlays({
 
   const syncHosts = useCallback(() => {
     const root = rootRef.current;
-    applyUnscheduledCopy(root);
     if (!root || view !== "week") {
       setDayCells((prev) => (prev.length === 0 ? prev : []));
       return;
@@ -351,17 +571,17 @@ function toScheduledCalendarEvent(event: ApiEvent): CalendarEvent {
       taskId: event.taskId,
       kind: event.taskId ? "task-block" : "event",
       color,
+      allDay: event.allDay,
     },
   };
 }
 
 function toUnscheduledCalendarEvent(task: ApiTask): CalendarEvent {
-  const now = dayjs();
   return {
     id: `${UNSCHEDULED_PREFIX}${task.id}`,
     title: task.name,
-    start: now,
-    end: now.add(1, "hour"),
+    start: null,
+    end: null,
     meta: {
       kind: "unscheduled-task",
       taskId: task.id,
@@ -389,17 +609,37 @@ function unscheduledTaskId(calendarEventId: string): string | null {
   return calendarEventId.slice(UNSCHEDULED_PREFIX.length);
 }
 
-/** Day/month/year views ignore event.color and use CSS --event-color instead. */
-function eventColorCss(events: CalendarEvent[]): string {
-  return events
-    .map((event) => {
-      const color = toGoogleDisplayColor(event.color);
-      if (!color) return "";
-      const text = eventContrastText(color);
-      return `[data-slot="event"][data-event-id="${CSS.escape(event.id)}"]{--event-color:${color};color:${text}}`;
-    })
-    .filter(Boolean)
-    .join("");
+function requireEventRange(
+  start: Dayjs | null | undefined,
+  end: Dayjs | null | undefined,
+): { start: Dayjs; end: Dayjs } {
+  if (start == null || end == null) {
+    throw new Error("Start and end times are required.");
+  }
+  return { start, end };
+}
+
+function applyWorkdayStart(start: Dayjs, workdayStart: string): Dayjs {
+  const match = /^(\d{1,2}):(\d{2})/.exec(workdayStart.trim());
+  const hour = match ? Number(match[1]) : 9;
+  const minute = match ? Number(match[2]) : 0;
+  return start.hour(hour).minute(minute).second(0).millisecond(0);
+}
+
+function scheduledRangeForUnscheduledDrop(
+  payload: CalendarEventMovePayload | CalendarEventResizePayload,
+  workdayStart: string,
+  durationMinutes: number,
+): { start: Dayjs; end: Dayjs } {
+  if (payload.view !== "week") {
+    return { start: payload.start, end: payload.end };
+  }
+  const hasClockTime =
+    payload.start.hour() !== 0 || payload.start.minute() !== 0;
+  const start = hasClockTime
+    ? payload.start
+    : applyWorkdayStart(payload.start, workdayStart);
+  return { start, end: start.add(durationMinutes, "minute") };
 }
 
 export function PullPlanCalendar() {
@@ -412,6 +652,7 @@ export function PullPlanCalendar() {
 
 function PullPlanCalendarView() {
   const [view, setView] = useState<CalendarViewMode>("day");
+  const [date, setDate] = useState<Dayjs>(() => dayjs());
   const [actionError, setActionError] = useState<string | null>(null);
   const [overlapPrompt, setOverlapPrompt] = useState<{
     titles: string[];
@@ -419,6 +660,16 @@ function PullPlanCalendarView() {
   } | null>(null);
   const overlapResolverRef = useRef<((ok: boolean) => void) | null>(null);
   const calendarRootRef = useRef<HTMLDivElement>(null);
+  const settingsQuery = useUserSettingsQuery();
+  const durationMinutes =
+    settingsQuery.data?.defaultEventDurationMinutes ??
+    DEFAULT_APP_SETTINGS.defaultEventDurationMinutes;
+  const workdayStart =
+    settingsQuery.data?.workdayStart ?? DEFAULT_APP_SETTINGS.workdayStart;
+  const workdayEnd =
+    settingsQuery.data?.workdayEnd ?? DEFAULT_APP_SETTINGS.workdayEnd;
+  const weekStartsOn =
+    settingsQuery.data?.weekStartsOn ?? DEFAULT_APP_SETTINGS.weekStartsOn;
   const {
     data: tasks = [],
     error: tasksError,
@@ -467,6 +718,7 @@ function PullPlanCalendarView() {
   }, [events, tasks]);
 
   const { getDraft, setDraft } = useEventCreateDraft();
+  const unscheduledKey = unscheduledEvents.map((event) => event.id).join(",");
 
   function settleOverlapPrompt(ok: boolean) {
     overlapResolverRef.current?.(ok);
@@ -498,62 +750,26 @@ function PullPlanCalendarView() {
     });
   }
 
-  const calendarKey = `${events
-    .map((e) => `${e.id}:${e.color ?? ""}`)
-    .join(",")}|${tasks.map((t) => t.id).join(",")}`;
-  const calendarInstanceKey = `${calendarKey}|${view === "day" ? "day" : "range"}`;
-  const eventColorsCss = useMemo(
-    () => eventColorCss(scheduledEvents),
-    [scheduledEvents],
-  );
-
-  useEffect(() => {
-    if (calendarLoading) return;
-    const root = calendarRootRef.current;
-    if (!root) return;
-
-    let clicks = 0;
-    const syncLibraryView = () => {
-      const dataView = root
-        .querySelector("[data-slot='calendar-content']")
-        ?.getAttribute("data-view");
-      if (dataView === view) {
-        if (view === "day") revealTodayInDayView(root);
-        return true;
-      }
-      if (clicks >= 3) return true;
-      const button = root.querySelector(
-        `[data-slot="segmented-control-option"][data-value="${view}"]`,
-      );
-      if (button instanceof HTMLElement) {
-        clicks += 1;
-        button.click();
-      }
-      return false;
-    };
-
-    if (syncLibraryView()) return;
-    const observer = new MutationObserver(() => {
-      if (syncLibraryView()) observer.disconnect();
-    });
-    observer.observe(root, { childList: true, subtree: true, attributes: true });
-    return () => observer.disconnect();
-  }, [view, calendarInstanceKey, calendarLoading]);
+  function handleViewChange(next: CalendarViewMode) {
+    setView(next);
+    writeStoredCalendarView(next);
+  }
 
   async function handleEventCreate(payload: CalendarEventCreatePayload) {
     setActionError(null);
     try {
+      const { start, end } = requireEventRange(payload.start, payload.end);
       const draft = getDraft();
       await confirmOverlapIfNeeded({
-        start: dayjs(payload.start).toDate(),
-        end: dayjs(payload.end).toDate(),
+        start: start.toDate(),
+        end: end.toDate(),
         busy: draft.busy,
         confirmLabel: "Create anyway",
       });
       const created = await createEventMutation.mutateAsync({
         title: payload.title.trim() || "Untitled event",
-        start: payload.start.toISOString(),
-        end: payload.end.toISOString(),
+        start: start.toISOString(),
+        end: end.toISOString(),
         ...draft,
         color: draft.color,
       });
@@ -591,11 +807,18 @@ function PullPlanCalendarView() {
       events.find((e) => e.id === parseMasterEventId(payload.id));
 
     const taskId = unscheduledTaskId(payload.id);
+    const range = taskId
+      ? scheduledRangeForUnscheduledDrop(
+          payload,
+          workdayStart,
+          durationMinutes,
+        )
+      : { start: payload.start, end: payload.end };
     setActionError(null);
     try {
       await confirmOverlapIfNeeded({
-        start: dayjs(payload.start).toDate(),
-        end: dayjs(payload.end).toDate(),
+        start: range.start.toDate(),
+        end: range.end.toDate(),
         excludeId: taskId ? null : payload.id,
         busy: matched?.busy ?? true,
         confirmLabel: taskId ? "Schedule anyway" : "Save anyway",
@@ -603,16 +826,16 @@ function PullPlanCalendarView() {
       if (taskId) {
         await scheduleTaskMutation.mutateAsync({
           taskId,
-          start: payload.start.toISOString(),
-          end: payload.end.toISOString(),
+          start: range.start.toISOString(),
+          end: range.end.toISOString(),
         });
         return;
       }
       await updateEventMutation.mutateAsync({
         id: payload.id,
         input: {
-          start: payload.start.toISOString(),
-          end: payload.end.toISOString(),
+          start: range.start.toISOString(),
+          end: range.end.toISOString(),
         },
       });
     } catch (err) {
@@ -627,20 +850,7 @@ function PullPlanCalendarView() {
   return (
     <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-3">
       <div className="relative min-h-0 flex-1">
-      <div
-        ref={calendarRootRef}
-        className="eventra-calendar-shell"
-        onClick={(event) => {
-          const target = event.target as HTMLElement | null;
-          const option = target?.closest?.("[data-value]");
-          const clicked = option?.getAttribute("data-value");
-          if (clicked && isCalendarViewMode(clicked)) {
-            setView(clicked);
-            writeStoredCalendarView(clicked);
-          }
-        }}
-      >
-      {eventColorsCss ? <style>{eventColorsCss}</style> : null}
+      <div ref={calendarRootRef} className="eventra-calendar-shell">
       <style>{DAY_WEEK_ADD_EVENT_CSS}</style>
       <CalendarAddEventButton
         onClick={() => openLibraryCreateEvent(calendarRootRef.current)}
@@ -648,7 +858,7 @@ function PullPlanCalendarView() {
       <CalendarAddEventOverlays
         rootRef={calendarRootRef}
         view={view}
-        calendarKey={calendarInstanceKey}
+        calendarKey={unscheduledKey}
       />
       {calendarLoading ? (
         <div
@@ -670,11 +880,27 @@ function PullPlanCalendarView() {
         </div>
       ) : (
       <Calendar
-        key={calendarInstanceKey}
+        key={unscheduledKey}
         showSwitcher={true}
         views={["week", "year", "day", "month"]}
-        defaultScheduledEvents={scheduledEvents}
+        view={view}
+        onViewChange={handleViewChange}
+        date={date}
+        onDateChange={setDate}
+        events={scheduledEvents}
         defaultUnscheduledEvents={unscheduledEvents}
+        defaultDurationMinutes={durationMinutes}
+        workdayStart={workdayStart}
+        workdayEnd={workdayEnd}
+        showFullDay={true}
+        weekStartsOn={weekStartsOn}
+        maxEventsPerDay={MAX_EVENTS_PER_DAY}
+        todayButtonContent="Today"
+        todayButtonClassName={TODAY_BUTTON_CLASS_NAME}
+        labels={{
+          unscheduledTitle: UNSCHEDULED_TITLE,
+          unscheduledHint: UNSCHEDULED_HINT,
+        }}
         onEventMove={persistMoveOrResize}
         onEventResize={persistMoveOrResize}
         onEventCreate={handleEventCreate}

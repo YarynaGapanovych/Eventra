@@ -1,0 +1,266 @@
+diff --git a/dist/index.js b/dist/index.js
+index 07102b5..f9ec40f 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -257,28 +257,28 @@ var getEventsForWeek = (week, events) => {
+   return events.filter((event) => {
+     const start = (0, import_dayjs2.default)(event.start);
+     const end = (0, import_dayjs2.default)(event.end);
+-    return week.some((day) => day.isBetween(start, end, void 0, "[]"));
++    return week.some((day) => day.isBetween(start, end, "day", "[]"));
+   });
+ };
+ var getEventsForYear = (week, events, year) => {
+   return events.filter((event) => {
+     const start = (0, import_dayjs2.default)(event.start);
+     const end = (0, import_dayjs2.default)(event.end);
+-    return week.some((day) => day.isBetween(start, end, void 0, "[]")) && (start.year() === year || end.year() === year);
++    return week.some((day) => day.isBetween(start, end, "day", "[]")) && (start.year() === year || end.year() === year);
+   });
+ };
+ var getTasksForWeek = (week, tasks) => {
+   return tasks.filter((task) => {
+     const start = (0, import_dayjs2.default)(task.startDate);
+     const end = (0, import_dayjs2.default)(task.endDate);
+-    return week.some((day) => day.isBetween(start, end, void 0, "[]"));
++    return week.some((day) => day.isBetween(start, end, "day", "[]"));
+   });
+ };
+ var getTasksForYear = (week, tasks, year) => {
+   return tasks.filter((task) => {
+     const start = (0, import_dayjs2.default)(task.startDate);
+     const end = (0, import_dayjs2.default)(task.endDate);
+-    return week.some((day) => day.isBetween(start, end, void 0, "[]")) && (start.year() === year || end.year() === year);
++    return week.some((day) => day.isBetween(start, end, "day", "[]")) && (start.year() === year || end.year() === year);
+   });
+ };
+ 
+@@ -541,6 +541,16 @@ function formatEventTimeLabel(event) {
+   }
+   return `${start.format("MMM D h:mm A")} \u2013 ${end.format("MMM D h:mm A")}`;
+ }
++function formatMonthDayTimeLabel(event) {
++  var _a;
++  if (((_a = event.meta) == null ? void 0 : _a.allDay) === true) return "";
++  if (isAllDayLikeEvent(event)) return "";
++  const start = (0, import_dayjs4.default)(event.start);
++  const end = (0, import_dayjs4.default)(event.end);
++  if (!start.isValid() || !end.isValid()) return "";
++  if (end.diff(start, "hour", true) >= 20) return "";
++  return start.format("h:mm A");
++}
+ function getEventChipStyle(event, extra) {
+   var _a;
+   return __spreadValues({
+@@ -1688,6 +1698,7 @@ function Week({
+   updateTask = async () => {
+   },
+   mapFromEvent,
++  EventActionButton,
+   EventDetailModal,
+   weekStartsOn = 0,
+   maxEventsPerDay = 3
+@@ -1808,7 +1819,7 @@ function Week({
+           /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { "data-slot": "week-day-events", children: [
+             visible.map((event) => {
+               var _a;
+-              const timeLabel = formatEventTimeLabel(event);
++              const timeLabel = formatMonthDayTimeLabel(event);
+               return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+                 "div",
+                 {
+@@ -1821,11 +1832,14 @@ function Week({
+                     void handleEventClick(event);
+                   },
+                   children: [
+-                    timeLabel ? /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("span", { "data-slot": "event-time", children: [
+-                      timeLabel,
+-                      " "
+-                    ] }) : null,
+-                    event.title
++                    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }, children: [
++                      timeLabel ? /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("span", { "data-slot": "event-time", children: [
++                        timeLabel,
++                        " "
++                      ] }) : null,
++                      event.title
++                    ] }),
++                    view === "month" ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(EventActionButtonSlot, { event, onOpen: () => handleEventClick(event), EventActionButton }) : null
+                   ]
+                 },
+                 event.id
+@@ -1851,7 +1865,7 @@ function Week({
+                 }
+               ),
+               showMore && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { "data-slot": "day-more-popover", role: "listbox", children: dayEvents.slice(maxEventsPerDay).map((event) => {
+-                const timeLabel = formatEventTimeLabel(event);
++                const timeLabel = formatMonthDayTimeLabel(event);
+                 return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+                   "button",
+                   {
+@@ -1886,7 +1900,7 @@ function Week({
+       (day) => (0, import_dayjs8.default)(day).isBetween(
+         (0, import_dayjs8.default)(event.start),
+         (0, import_dayjs8.default)(event.end),
+-        void 0,
++        "day",
+         "[]"
+       )
+     )
+@@ -2020,6 +2034,7 @@ function MonthView({
+   mapFromEvent,
+   AddEventButton,
+   CreateEventModal,
++  EventActionButton,
+   EventDetailModal,
+   previousMonthButtonContent = "\u2190",
+   nextMonthButtonContent = "\u2192",
+@@ -2130,6 +2145,7 @@ function MonthView({
+             onDateClick,
+             updateTask,
+             mapFromEvent,
++            EventActionButton,
+             EventDetailModal,
+             weekStartsOn,
+             maxEventsPerDay
+@@ -3332,6 +3348,7 @@ function Calendar({
+         mapFromEvent,
+         AddEventButton,
+         CreateEventModal,
++        EventActionButton,
+         EventDetailModal,
+         previousMonthButtonContent,
+         nextMonthButtonContent,
+diff --git a/dist/index.mjs b/dist/index.mjs
+index d9c188d..b7f421f 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -194,28 +194,28 @@ var getEventsForWeek = (week, events) => {
+   return events.filter((event) => {
+     const start = dayjs2(event.start);
+     const end = dayjs2(event.end);
+-    return week.some((day) => day.isBetween(start, end, void 0, "[]"));
++    return week.some((day) => day.isBetween(start, end, "day", "[]"));
+   });
+ };
+ var getEventsForYear = (week, events, year) => {
+   return events.filter((event) => {
+     const start = dayjs2(event.start);
+     const end = dayjs2(event.end);
+-    return week.some((day) => day.isBetween(start, end, void 0, "[]")) && (start.year() === year || end.year() === year);
++    return week.some((day) => day.isBetween(start, end, "day", "[]")) && (start.year() === year || end.year() === year);
+   });
+ };
+ var getTasksForWeek = (week, tasks) => {
+   return tasks.filter((task) => {
+     const start = dayjs2(task.startDate);
+     const end = dayjs2(task.endDate);
+-    return week.some((day) => day.isBetween(start, end, void 0, "[]"));
++    return week.some((day) => day.isBetween(start, end, "day", "[]"));
+   });
+ };
+ var getTasksForYear = (week, tasks, year) => {
+   return tasks.filter((task) => {
+     const start = dayjs2(task.startDate);
+     const end = dayjs2(task.endDate);
+-    return week.some((day) => day.isBetween(start, end, void 0, "[]")) && (start.year() === year || end.year() === year);
++    return week.some((day) => day.isBetween(start, end, "day", "[]")) && (start.year() === year || end.year() === year);
+   });
+ };
+ 
+@@ -478,6 +478,16 @@ function formatEventTimeLabel(event) {
+   }
+   return `${start.format("MMM D h:mm A")} \u2013 ${end.format("MMM D h:mm A")}`;
+ }
++function formatMonthDayTimeLabel(event) {
++  var _a;
++  if (((_a = event.meta) == null ? void 0 : _a.allDay) === true) return "";
++  if (isAllDayLikeEvent(event)) return "";
++  const start = dayjs4(event.start);
++  const end = dayjs4(event.end);
++  if (!start.isValid() || !end.isValid()) return "";
++  if (end.diff(start, "hour", true) >= 20) return "";
++  return start.format("h:mm A");
++}
+ function getEventChipStyle(event, extra) {
+   var _a;
+   return __spreadValues({
+@@ -1625,6 +1635,7 @@ function Week({
+   updateTask = async () => {
+   },
+   mapFromEvent,
++  EventActionButton,
+   EventDetailModal,
+   weekStartsOn = 0,
+   maxEventsPerDay = 3
+@@ -1745,7 +1756,7 @@ function Week({
+           /* @__PURE__ */ jsxs4("div", { "data-slot": "week-day-events", children: [
+             visible.map((event) => {
+               var _a;
+-              const timeLabel = formatEventTimeLabel(event);
++              const timeLabel = formatMonthDayTimeLabel(event);
+               return /* @__PURE__ */ jsxs4(
+                 "div",
+                 {
+@@ -1758,11 +1769,14 @@ function Week({
+                     void handleEventClick(event);
+                   },
+                   children: [
+-                    timeLabel ? /* @__PURE__ */ jsxs4("span", { "data-slot": "event-time", children: [
+-                      timeLabel,
+-                      " "
+-                    ] }) : null,
+-                    event.title
++                    /* @__PURE__ */ jsxs4("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }, children: [
++                      timeLabel ? /* @__PURE__ */ jsxs4("span", { "data-slot": "event-time", children: [
++                        timeLabel,
++                        " "
++                      ] }) : null,
++                      event.title
++                    ] }),
++                    view === "month" ? /* @__PURE__ */ jsx11(EventActionButtonSlot, { event, onOpen: () => handleEventClick(event), EventActionButton }) : null
+                   ]
+                 },
+                 event.id
+@@ -1788,7 +1802,7 @@ function Week({
+                 }
+               ),
+               showMore && /* @__PURE__ */ jsx11("div", { "data-slot": "day-more-popover", role: "listbox", children: dayEvents.slice(maxEventsPerDay).map((event) => {
+-                const timeLabel = formatEventTimeLabel(event);
++                const timeLabel = formatMonthDayTimeLabel(event);
+                 return /* @__PURE__ */ jsxs4(
+                   "button",
+                   {
+@@ -1823,7 +1837,7 @@ function Week({
+       (day) => dayjs8(day).isBetween(
+         dayjs8(event.start),
+         dayjs8(event.end),
+-        void 0,
++        "day",
+         "[]"
+       )
+     )
+@@ -1957,6 +1971,7 @@ function MonthView({
+   mapFromEvent,
+   AddEventButton,
+   CreateEventModal,
++  EventActionButton,
+   EventDetailModal,
+   previousMonthButtonContent = "\u2190",
+   nextMonthButtonContent = "\u2192",
+@@ -2067,6 +2082,7 @@ function MonthView({
+             onDateClick,
+             updateTask,
+             mapFromEvent,
++            EventActionButton,
+             EventDetailModal,
+             weekStartsOn,
+             maxEventsPerDay
+@@ -3275,6 +3291,7 @@ function Calendar({
+         mapFromEvent,
+         AddEventButton,
+         CreateEventModal,
++        EventActionButton,
+         EventDetailModal,
+         previousMonthButtonContent,
+         nextMonthButtonContent,
