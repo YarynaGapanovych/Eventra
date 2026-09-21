@@ -1,0 +1,19 @@
+name: Keep Render API awake
+
+on:
+  schedule:
+    # Render free web services spin down after 15 minutes with no inbound HTTP.
+    # Ping /health every 10 minutes from GitHub so the idle timer resets.
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: GET /health
+        run: |
+          set -euo pipefail
+          body="$(curl -fsS --max-time 90 https://eventra-api-y6h4.onrender.com/health)"
+          test "$body" = "ok"
