@@ -5,7 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
-  pull-plan-calendar@0.1.3: 5245dd09da7d513cc07ea3e4431cd4955b569e0d6c99eb14249fe5ec14a446f9
+  pull-plan-calendar@0.1.3: e1d936043b51792cbb3e6f552393c3dc4b57f3f61a6bd18f2fcb41bdec05e25b
 
 importers:
 
@@ -43,7 +43,7 @@ importers:
         version: 16.2.3(@babel/core@7.29.0(supports-color@7.2.0))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       pull-plan-calendar:
         specifier: ^0.1.3
-        version: 0.1.3(patch_hash=5245dd09da7d513cc07ea3e4431cd4955b569e0d6c99eb14249fe5ec14a446f9)(@dnd-kit/core@6.3.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(dayjs@1.11.20)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        version: 0.1.3(patch_hash=e1d936043b51792cbb3e6f552393c3dc4b57f3f61a6bd18f2fcb41bdec05e25b)(@dnd-kit/core@6.3.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(dayjs@1.11.20)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       radix-ui:
         specifier: ^1.4.3
         version: 1.4.3(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -7386,7 +7386,7 @@ snapshots:
       forwarded: 0.2.0
       ipaddr.js: 1.9.1
 
-  pull-plan-calendar@0.1.3(patch_hash=5245dd09da7d513cc07ea3e4431cd4955b569e0d6c99eb14249fe5ec14a446f9)(@dnd-kit/core@6.3.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(dayjs@1.11.20)(react-dom@19.2.4(react@19.2.4))(react@19.2.4):
+  pull-plan-calendar@0.1.3(patch_hash=e1d936043b51792cbb3e6f552393c3dc4b57f3f61a6bd18f2fcb41bdec05e25b)(@dnd-kit/core@6.3.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(dayjs@1.11.20)(react-dom@19.2.4(react@19.2.4))(react@19.2.4):
     dependencies:
       '@dnd-kit/core': 6.3.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       dayjs: 1.11.20
