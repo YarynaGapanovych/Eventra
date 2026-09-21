@@ -333,6 +333,7 @@ input UpdateUserSettingsInput {
   defaultEventDurationMinutes: Int!
   showPastDoneTaskEvents: Boolean!
   timezone: String!
+  weekStartsOn: Int!
   workdayEnd: String!
   workdayStart: String!
 }
@@ -341,6 +342,7 @@ type UserSettings {
   defaultEventDurationMinutes: Int!
   showPastDoneTaskEvents: Boolean!
   timezone: String!
+  weekStartsOn: Int!
   workdayEnd: String!
   workdayStart: String!
 }

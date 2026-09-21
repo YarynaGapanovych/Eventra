@@ -1,5 +1,7 @@
 const STORAGE_KEY = "eventra.settings.v1";
 
+export type WeekStartsOn = 0 | 1;
+
 export type AppSettings = {
   /** Local wall-clock HH:mm */
   workdayStart: string;
@@ -8,6 +10,8 @@ export type AppSettings = {
   timezone: string;
   defaultEventDurationMinutes: number;
   showPastDoneTaskEvents: boolean;
+  /** 0 = Sunday, 1 = Monday */
+  weekStartsOn: WeekStartsOn;
 };
 
 export const DEFAULT_APP_SETTINGS: Omit<AppSettings, "timezone"> = {
@@ -15,6 +19,7 @@ export const DEFAULT_APP_SETTINGS: Omit<AppSettings, "timezone"> = {
   workdayEnd: "17:00",
   defaultEventDurationMinutes: 60,
   showPastDoneTaskEvents: true,
+  weekStartsOn: 1,
 };
 
 const DURATION_CHOICES = [15, 30, 45, 60, 90, 120] as const;
@@ -62,6 +67,15 @@ function coerceDuration(value: unknown, fallback: number): number {
     typeof value === "number" ? value : Number.parseInt(String(value), 10);
   if (!Number.isFinite(n) || n < 5 || n > 24 * 60) return fallback;
   return n;
+}
+
+function coerceWeekStartsOn(
+  value: unknown,
+  fallback: WeekStartsOn,
+): WeekStartsOn {
+  const n =
+    typeof value === "number" ? value : Number.parseInt(String(value), 10);
+  return n === 0 || n === 1 ? n : fallback;
 }
 
 export function listTimezones(): string[] {
@@ -122,6 +136,10 @@ export function normalizeSettingsPartial(raw: unknown): AppSettings {
       typeof o.showPastDoneTaskEvents === "boolean"
         ? o.showPastDoneTaskEvents
         : DEFAULT_APP_SETTINGS.showPastDoneTaskEvents,
+    weekStartsOn: coerceWeekStartsOn(
+      o.weekStartsOn,
+      DEFAULT_APP_SETTINGS.weekStartsOn,
+    ),
   };
 }
 

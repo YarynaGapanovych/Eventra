@@ -17,6 +17,7 @@ type UserSettingsPayload = {
   timezone: string;
   defaultEventDurationMinutes: number;
   showPastDoneTaskEvents: boolean;
+  weekStartsOn: number;
 };
 
 async function fetchUserSettings(): Promise<AppSettings> {

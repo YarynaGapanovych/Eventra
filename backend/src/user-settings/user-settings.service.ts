@@ -37,6 +37,7 @@ export class UserSettingsService {
         timezone,
         defaultEventDurationMinutes: input.defaultEventDurationMinutes,
         showPastDoneTaskEvents: input.showPastDoneTaskEvents,
+        weekStartsOn: normalizeWeekStartsOn(input.weekStartsOn),
       },
       create: {
         userId,
@@ -45,6 +46,7 @@ export class UserSettingsService {
         timezone,
         defaultEventDurationMinutes: input.defaultEventDurationMinutes,
         showPastDoneTaskEvents: input.showPastDoneTaskEvents,
+        weekStartsOn: normalizeWeekStartsOn(input.weekStartsOn),
       },
     });
     return this.toDto(row);
@@ -57,6 +59,7 @@ export class UserSettingsService {
       timezone: row.timezone,
       defaultEventDurationMinutes: row.defaultEventDurationMinutes,
       showPastDoneTaskEvents: row.showPastDoneTaskEvents,
+      weekStartsOn: row.weekStartsOn === 0 ? 0 : 1,
     };
   }
 }
@@ -76,6 +79,13 @@ function assertWorkdayRange(workdayStart: string, workdayEnd: string): void {
   if (endM <= startM) {
     throw new BadRequestException('End time must be after start time.');
   }
+}
+
+function normalizeWeekStartsOn(value: number): number {
+  if (value !== 0 && value !== 1) {
+    throw new BadRequestException('Week start must be Sunday or Monday.');
+  }
+  return value;
 }
 
 function normalizeTimezone(value: string): string {

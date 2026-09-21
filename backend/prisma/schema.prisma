@@ -65,6 +65,8 @@ model UserSettings {
   timezone                    String   @default("UTC")
   defaultEventDurationMinutes Int      @default(60)
   showPastDoneTaskEvents      Boolean  @default(true)
+  /** 0 = Sunday, 1 = Monday */
+  weekStartsOn                Int      @default(1)
   createdAt                   DateTime @default(now())
   updatedAt                   DateTime @updatedAt
 }

@@ -4,19 +4,43 @@ import { EventDetailsForm, defaultFormValues, formValuesToPayload, type EventDet
 import { useEventCreateDraft } from "@/components/event-create-color-context";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { isoToZonedParts } from "@/lib/calendar-details";
 import { DEFAULT_APP_SETTINGS } from "@/lib/app-settings";
 import { DEFAULT_EVENTRA_EVENT_COLOR } from "@/lib/event-colors";
 import { useUserSettingsQuery } from "@/hooks/use-user-settings";
-import dayjs from "dayjs";
+import dayjs, { type Dayjs } from "dayjs";
 import type { CreateTaskModalProps } from "pull-plan-calendar";
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
+
+function applySeededRange(
+  values: EventDetailsFormValues,
+  timezone: string,
+  durationMinutes: number,
+  initialStartDate?: Dayjs | null,
+  initialEndDate?: Dayjs | null,
+): EventDetailsFormValues {
+  if (initialStartDate == null && initialEndDate == null) return values;
+  const start = initialStartDate ?? initialEndDate!.subtract(durationMinutes, "minute");
+  const end = initialEndDate ?? start.add(Math.max(durationMinutes, 15), "minute");
+  const startParts = isoToZonedParts(start.toISOString(), timezone);
+  const endParts = isoToZonedParts(end.toISOString(), timezone);
+  return {
+    ...values,
+    startDate: startParts.date,
+    startTime: startParts.time,
+    endDate: endParts.date,
+    endTime: endParts.time,
+  };
+}
 
 export function CalendarCreateEventModal({
   isOpen,
   onClose,
   areaId,
   onSubmit,
+  initialStartDate,
+  initialEndDate,
   className,
 }: CreateTaskModalProps) {
   const settingsQuery = useUserSettingsQuery();
@@ -36,15 +60,23 @@ export function CalendarCreateEventModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    const next = {
-      ...defaultFormValues(timezone, durationMinutes),
-      color: DEFAULT_EVENTRA_EVENT_COLOR,
-    };
+    const next = applySeededRange(
+      {
+        ...defaultFormValues(timezone, durationMinutes),
+        color: DEFAULT_EVENTRA_EVENT_COLOR,
+      },
+      timezone,
+      durationMinutes,
+      initialStartDate,
+      initialEndDate,
+    );
     setValues(next);
     setDraft({
       ...formValuesToPayload(next, { timesOptional: false }).calendar,
       color: next.color,
     });
+    // Seed only when the modal opens; initials are read from the open render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- open transition only
   }, [isOpen, timezone, durationMinutes, setDraft]);
 
   function handleChange(next: EventDetailsFormValues) {

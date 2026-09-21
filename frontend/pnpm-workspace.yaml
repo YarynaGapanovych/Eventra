@@ -2,3 +2,7 @@ allowBuilds:
   msw: true
   sharp: true
   unrs-resolver: true
+minimumReleaseAgeExclude:
+  - pull-plan-calendar@0.1.3
+patchedDependencies:
+  pull-plan-calendar@0.1.3: patches/pull-plan-calendar@0.1.3.patch

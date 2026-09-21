@@ -28,6 +28,9 @@ export class UserSettings {
 
   @Field()
   showPastDoneTaskEvents!: boolean;
+
+  @Field(() => Int)
+  weekStartsOn!: number;
 }
 
 @InputType()
@@ -57,4 +60,10 @@ export class UpdateUserSettingsInput {
   @Field()
   @IsBoolean()
   showPastDoneTaskEvents!: boolean;
+
+  @Field(() => Int)
+  @IsInt()
+  @Min(0)
+  @Max(1)
+  weekStartsOn!: number;
 }

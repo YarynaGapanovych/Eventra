@@ -6,6 +6,7 @@ export const USER_SETTINGS_QUERY = `
       timezone
       defaultEventDurationMinutes
       showPastDoneTaskEvents
+      weekStartsOn
     }
   }
 `;
