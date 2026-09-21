@@ -41,6 +41,7 @@ const settingsFormSchema = z
     workdayStart: timeHmSchema,
     workdayEnd: timeHmSchema,
     timezone: z.string().trim().min(1, "Time zone is required."),
+    weekStartsOn: z.union([z.literal(0), z.literal(1)]),
     defaultEventDurationMinutes: z
       .number()
       .int("Duration must be a whole number of minutes.")
@@ -215,30 +216,55 @@ export function SettingsPanel() {
             Time zone
           </h2>
 
-          <div className="mt-4 space-y-2">
-            <Label htmlFor="settings-tz">Region</Label>
-            <Input
-              id="settings-tz"
-              list="iana-timezones"
-              autoComplete="off"
-              disabled={fieldsDisabled}
-              className="font-mono text-sm"
-              placeholder="e.g. Europe/Warsaw"
-              aria-invalid={!!formState.errors.timezone}
-              {...register("timezone")}
-            />
-            {formState.errors.timezone ? (
-              <p className="text-xs text-red-600 dark:text-red-400">
-                {formState.errors.timezone.message}
-              </p>
-            ) : null}
-            {zones.length > 0 ? (
-              <datalist id="iana-timezones">
-                {zones.map((z) => (
-                  <option key={z} value={z} />
-                ))}
-              </datalist>
-            ) : null}
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="settings-tz">Region</Label>
+              <Input
+                id="settings-tz"
+                list="iana-timezones"
+                autoComplete="off"
+                disabled={fieldsDisabled}
+                className="font-mono text-sm"
+                placeholder="e.g. Europe/Warsaw"
+                aria-invalid={!!formState.errors.timezone}
+                {...register("timezone")}
+              />
+              {formState.errors.timezone ? (
+                <p className="text-xs text-red-600 dark:text-red-400">
+                  {formState.errors.timezone.message}
+                </p>
+              ) : null}
+              {zones.length > 0 ? (
+                <datalist id="iana-timezones">
+                  {zones.map((z) => (
+                    <option key={z} value={z} />
+                  ))}
+                </datalist>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="settings-week-start">Week starts on</Label>
+              <select
+                id="settings-week-start"
+                disabled={fieldsDisabled}
+                aria-invalid={!!formState.errors.weekStartsOn}
+                className={cn(
+                  "flex h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm shadow-none outline-none",
+                  "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+                  "disabled:cursor-not-allowed disabled:opacity-50",
+                  "dark:border-zinc-700 dark:bg-zinc-950",
+                )}
+                {...register("weekStartsOn", { valueAsNumber: true })}
+              >
+                <option value={1}>Monday</option>
+                <option value={0}>Sunday</option>
+              </select>
+              {formState.errors.weekStartsOn ? (
+                <p className="text-xs text-red-600 dark:text-red-400">
+                  {formState.errors.weekStartsOn.message}
+                </p>
+              ) : null}
+            </div>
           </div>
         </section>
 
