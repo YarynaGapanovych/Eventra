@@ -1,5 +1,5 @@
 diff --git a/dist/index.js b/dist/index.js
-index 07102b5..f9ec40f 100644
+index 07102b537704472c589782ef499237159ec9a07b..85e9f14f882b1780c17e10a1cb5231f842224d80 100644
 --- a/dist/index.js
 +++ b/dist/index.js
 @@ -257,28 +257,28 @@ var getEventsForWeek = (week, events) => {
@@ -52,15 +52,7 @@ index 07102b5..f9ec40f 100644
  function getEventChipStyle(event, extra) {
    var _a;
    return __spreadValues({
-@@ -1688,6 +1698,7 @@ function Week({
-   updateTask = async () => {
-   },
-   mapFromEvent,
-+  EventActionButton,
-   EventDetailModal,
-   weekStartsOn = 0,
-   maxEventsPerDay = 3
-@@ -1808,7 +1819,7 @@ function Week({
+@@ -1808,7 +1818,7 @@ function Week({
            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { "data-slot": "week-day-events", children: [
              visible.map((event) => {
                var _a;
@@ -69,27 +61,7 @@ index 07102b5..f9ec40f 100644
                return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
                  "div",
                  {
-@@ -1821,11 +1832,14 @@ function Week({
-                     void handleEventClick(event);
-                   },
-                   children: [
--                    timeLabel ? /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("span", { "data-slot": "event-time", children: [
--                      timeLabel,
--                      " "
--                    ] }) : null,
--                    event.title
-+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }, children: [
-+                      timeLabel ? /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("span", { "data-slot": "event-time", children: [
-+                        timeLabel,
-+                        " "
-+                      ] }) : null,
-+                      event.title
-+                    ] }),
-+                    view === "month" ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(EventActionButtonSlot, { event, onOpen: () => handleEventClick(event), EventActionButton }) : null
-                   ]
-                 },
-                 event.id
-@@ -1851,7 +1865,7 @@ function Week({
+@@ -1851,7 +1861,7 @@ function Week({
                  }
                ),
                showMore && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { "data-slot": "day-more-popover", role: "listbox", children: dayEvents.slice(maxEventsPerDay).map((event) => {
@@ -98,7 +70,7 @@ index 07102b5..f9ec40f 100644
                  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
                    "button",
                    {
-@@ -1886,7 +1900,7 @@ function Week({
+@@ -1886,7 +1896,7 @@ function Week({
        (day) => (0, import_dayjs8.default)(day).isBetween(
          (0, import_dayjs8.default)(event.start),
          (0, import_dayjs8.default)(event.end),
@@ -107,32 +79,17 @@ index 07102b5..f9ec40f 100644
          "[]"
        )
      )
-@@ -2020,6 +2034,7 @@ function MonthView({
-   mapFromEvent,
-   AddEventButton,
-   CreateEventModal,
-+  EventActionButton,
-   EventDetailModal,
-   previousMonthButtonContent = "\u2190",
-   nextMonthButtonContent = "\u2192",
-@@ -2130,6 +2145,7 @@ function MonthView({
-             onDateClick,
-             updateTask,
-             mapFromEvent,
-+            EventActionButton,
-             EventDetailModal,
-             weekStartsOn,
-             maxEventsPerDay
-@@ -3332,6 +3348,7 @@ function Calendar({
-         mapFromEvent,
-         AddEventButton,
-         CreateEventModal,
-+        EventActionButton,
-         EventDetailModal,
-         previousMonthButtonContent,
-         nextMonthButtonContent,
+@@ -2274,7 +2284,7 @@ function WeekEventCard({
+       isDragging
+     ]
+   );
+-  const timeLabel = formatEventTimeLabel(event);
++  const timeLabel = formatMonthDayTimeLabel(event);
+   const stopDragSensors = (e) => {
+     e.stopPropagation();
+   };
 diff --git a/dist/index.mjs b/dist/index.mjs
-index d9c188d..b7f421f 100644
+index d9c188d346d845045e6c05d78e78c83bf736bb3f..35604c1e4e1734e2322f761f9ec35a5e36833460 100644
 --- a/dist/index.mjs
 +++ b/dist/index.mjs
 @@ -194,28 +194,28 @@ var getEventsForWeek = (week, events) => {
@@ -185,15 +142,7 @@ index d9c188d..b7f421f 100644
  function getEventChipStyle(event, extra) {
    var _a;
    return __spreadValues({
-@@ -1625,6 +1635,7 @@ function Week({
-   updateTask = async () => {
-   },
-   mapFromEvent,
-+  EventActionButton,
-   EventDetailModal,
-   weekStartsOn = 0,
-   maxEventsPerDay = 3
-@@ -1745,7 +1756,7 @@ function Week({
+@@ -1745,7 +1755,7 @@ function Week({
            /* @__PURE__ */ jsxs4("div", { "data-slot": "week-day-events", children: [
              visible.map((event) => {
                var _a;
@@ -202,27 +151,7 @@ index d9c188d..b7f421f 100644
                return /* @__PURE__ */ jsxs4(
                  "div",
                  {
-@@ -1758,11 +1769,14 @@ function Week({
-                     void handleEventClick(event);
-                   },
-                   children: [
--                    timeLabel ? /* @__PURE__ */ jsxs4("span", { "data-slot": "event-time", children: [
--                      timeLabel,
--                      " "
--                    ] }) : null,
--                    event.title
-+                    /* @__PURE__ */ jsxs4("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }, children: [
-+                      timeLabel ? /* @__PURE__ */ jsxs4("span", { "data-slot": "event-time", children: [
-+                        timeLabel,
-+                        " "
-+                      ] }) : null,
-+                      event.title
-+                    ] }),
-+                    view === "month" ? /* @__PURE__ */ jsx11(EventActionButtonSlot, { event, onOpen: () => handleEventClick(event), EventActionButton }) : null
-                   ]
-                 },
-                 event.id
-@@ -1788,7 +1802,7 @@ function Week({
+@@ -1788,7 +1798,7 @@ function Week({
                  }
                ),
                showMore && /* @__PURE__ */ jsx11("div", { "data-slot": "day-more-popover", role: "listbox", children: dayEvents.slice(maxEventsPerDay).map((event) => {
@@ -231,7 +160,7 @@ index d9c188d..b7f421f 100644
                  return /* @__PURE__ */ jsxs4(
                    "button",
                    {
-@@ -1823,7 +1837,7 @@ function Week({
+@@ -1823,7 +1833,7 @@ function Week({
        (day) => dayjs8(day).isBetween(
          dayjs8(event.start),
          dayjs8(event.end),
@@ -240,27 +169,12 @@ index d9c188d..b7f421f 100644
          "[]"
        )
      )
-@@ -1957,6 +1971,7 @@ function MonthView({
-   mapFromEvent,
-   AddEventButton,
-   CreateEventModal,
-+  EventActionButton,
-   EventDetailModal,
-   previousMonthButtonContent = "\u2190",
-   nextMonthButtonContent = "\u2192",
-@@ -2067,6 +2082,7 @@ function MonthView({
-             onDateClick,
-             updateTask,
-             mapFromEvent,
-+            EventActionButton,
-             EventDetailModal,
-             weekStartsOn,
-             maxEventsPerDay
-@@ -3275,6 +3291,7 @@ function Calendar({
-         mapFromEvent,
-         AddEventButton,
-         CreateEventModal,
-+        EventActionButton,
-         EventDetailModal,
-         previousMonthButtonContent,
-         nextMonthButtonContent,
+@@ -2217,7 +2227,7 @@ function WeekEventCard({
+       isDragging
+     ]
+   );
+-  const timeLabel = formatEventTimeLabel(event);
++  const timeLabel = formatMonthDayTimeLabel(event);
+   const stopDragSensors = (e) => {
+     e.stopPropagation();
+   };

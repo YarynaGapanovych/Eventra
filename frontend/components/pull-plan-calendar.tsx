@@ -112,12 +112,15 @@ const DAY_WEEK_ADD_EVENT_CSS = `
 .eventra-calendar-shell {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
 }
 .eventra-calendar-shell > [data-slot="calendar-add-event"] {
   grid-column: 1;
   grid-row: 1;
   z-index: 2;
+  align-self: center;
   margin: 1.5rem 0.75rem 1.5rem 0;
 }
 .eventra-calendar-shell [data-slot="calendar-root"] {
@@ -128,11 +131,92 @@ const DAY_WEEK_ADD_EVENT_CSS = `
   grid-row: 1;
   display: flex;
   justify-content: flex-end;
+  align-self: center;
   margin: 1.5rem 0;
 }
 .eventra-calendar-shell [data-slot="calendar-content"] {
   grid-column: 1 / -1;
   grid-row: 2;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+.eventra-calendar-shell [data-slot="day-view"],
+.eventra-calendar-shell [data-slot="week-view"],
+.eventra-calendar-shell [data-slot="month-view"],
+.eventra-calendar-shell [data-slot="year-view"] {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.eventra-calendar-shell [data-slot="day-view-grid"],
+.eventra-calendar-shell [data-slot="week-view-grid"],
+.eventra-calendar-shell [data-slot="month-view-body"],
+.eventra-calendar-shell [data-slot="year-view-months"] {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.eventra-calendar-shell [data-slot="week-view-grid"] {
+  align-content: start;
+}
+.eventra-calendar-shell [data-slot="unscheduled-list"] {
+  margin-top: auto;
+  flex-shrink: 0;
+}
+@media (min-width: 768px) {
+  .eventra-calendar-shell {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    column-gap: 0.75rem;
+    row-gap: 0.75rem;
+  }
+  .eventra-calendar-shell > [data-slot="calendar-add-event"] {
+    margin: 0;
+  }
+  .eventra-calendar-shell [data-slot="calendar-view-switcher"] {
+    grid-column: 3;
+    margin: 0;
+  }
+  .eventra-calendar-shell [data-slot="calendar-content"],
+  .eventra-calendar-shell [data-slot="day-view"],
+  .eventra-calendar-shell [data-slot="week-view"],
+  .eventra-calendar-shell [data-slot="month-view"],
+  .eventra-calendar-shell [data-slot="year-view"] {
+    display: contents;
+  }
+  .eventra-calendar-shell [data-slot="day-view-nav"],
+  .eventra-calendar-shell [data-slot="week-view-nav"],
+  .eventra-calendar-shell [data-slot="month-view-nav"],
+  .eventra-calendar-shell [data-slot="year-view-nav"] {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+    min-width: 0;
+    margin-top: 0;
+  }
+  .eventra-calendar-shell [data-slot="day-multiday"] {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin-top: 0;
+  }
+  .eventra-calendar-shell [data-slot="day-view-grid"],
+  .eventra-calendar-shell [data-slot="week-view-grid"],
+  .eventra-calendar-shell [data-slot="month-view-body"],
+  .eventra-calendar-shell [data-slot="year-view-months"] {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    min-height: 0;
+    overflow: auto;
+    margin-top: 0;
+  }
+  .eventra-calendar-shell [data-slot="unscheduled-list"] {
+    grid-column: 1 / -1;
+    grid-row: 4;
+    margin-top: 0;
+  }
 }
 [data-slot="week-day-add-event"] {
   padding: 0.25rem;
@@ -145,6 +229,36 @@ const DAY_WEEK_ADD_EVENT_CSS = `
 }
 [data-slot="week-day-add-event"]:hover {
   color: #b1724b;
+}
+[data-slot="week-view"] [data-slot="week-day-cell"] {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-self: start;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  min-height: 0;
+  height: auto;
+  padding: 0.35rem 1.25rem 0.35rem 0.5rem !important;
+  border-right: none !important;
+  text-align: center;
+}
+[data-slot="week-view"] [data-slot="week-day-cell"] > span:first-child {
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+[data-slot="week-view"] [data-slot="week-day-cell"] > span:nth-child(2) {
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+[data-slot="week-view"] [data-slot="week-day-cell"] [data-slot="week-day-add-event"] {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.35rem;
+  padding: 0.15rem;
 }
 [data-slot="day-view-nav"] [data-slot="today-button"],
 [data-slot="week-view-nav"] [data-slot="today-button"] {
@@ -193,6 +307,7 @@ const DAY_WEEK_ADD_EVENT_CSS = `
   min-height: 7.5rem;
 }
 [data-slot="month-view"] [data-slot="week-day-cell"] {
+  position: relative;
   align-items: stretch;
   justify-content: flex-start;
   overflow: hidden;
@@ -228,8 +343,11 @@ const DAY_WEEK_ADD_EVENT_CSS = `
   line-height: 1.2;
 }
 [data-slot="month-view"] [data-slot="week-day"] button {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.4rem;
   opacity: 1;
-  padding: 0.25rem;
+  padding: 0.15rem;
   width: auto;
   height: auto;
   background: transparent;
@@ -260,7 +378,7 @@ const DAY_WEEK_ADD_EVENT_CSS = `
   max-width: 100%;
   min-width: 0;
   min-height: 2rem;
-  padding: 0.25rem 0.5rem;
+  padding: 0.15rem 0.4rem;
   border: none !important;
   border-radius: 0.5rem;
   font-size: 0.75rem;
@@ -300,6 +418,45 @@ const DAY_WEEK_ADD_EVENT_CSS = `
 [data-slot="month-view"] [data-slot="week-day-events"] [data-slot="event"] button svg {
   width: 0.875rem;
   height: 0.875rem;
+}
+[data-slot="week-view-grid"] [data-slot="event"] {
+  min-height: 2rem;
+  padding: 0.15rem 0.4rem !important;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.25;
+  color: #fff !important;
+}
+[data-slot="week-view-grid"] [data-slot="event"] > span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-slot="week-view-grid"] [data-slot="event"] button {
+  flex-shrink: 0;
+  height: auto !important;
+  min-height: 0 !important;
+  width: auto !important;
+  gap: 0 !important;
+  padding: 0.1rem !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: inherit !important;
+  cursor: pointer;
+  font-size: 0 !important;
+  opacity: 0.9;
+}
+[data-slot="week-view-grid"] [data-slot="event"] button svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+[data-slot="week-view-grid"] [data-slot="event"] [data-slot="event-time"],
+[data-slot="month-view"] [data-slot="event"] [data-slot="event-time"],
+[data-slot="month-view"] [data-slot="day-more-item"] [data-slot="event-time"] {
+  font: inherit;
 }
 [data-slot="month-view"] [data-slot="day-more-wrap"] {
   width: 100%;
@@ -534,8 +691,7 @@ function CalendarEventActionButton({
     <Button
       type="button"
       variant="outline"
-      size="sm"
-      className="gap-1.5"
+      size="icon-sm"
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => {
         e.stopPropagation();
@@ -545,7 +701,6 @@ function CalendarEventActionButton({
       aria-label={`View ${event.title}`}
     >
       <Eye className="size-3.5" aria-hidden />
-      View
     </Button>
   );
 }
@@ -848,9 +1003,9 @@ function PullPlanCalendarView() {
   }
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-3">
-      <div className="relative min-h-0 flex-1">
-      <div ref={calendarRootRef} className="eventra-calendar-shell">
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-7xl flex-1 flex-col gap-3">
+      <div className="relative flex min-h-0 flex-1 flex-col">
+      <div ref={calendarRootRef} className="eventra-calendar-shell min-h-0 flex-1">
       <style>{DAY_WEEK_ADD_EVENT_CSS}</style>
       <CalendarAddEventButton
         onClick={() => openLibraryCreateEvent(calendarRootRef.current)}
