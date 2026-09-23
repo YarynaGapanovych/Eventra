@@ -287,8 +287,8 @@ const DAY_WEEK_ADD_EVENT_CSS = `
   color: #18181b;
 }
 .eventra-calendar-shell [data-slot="segmented-control"] button[aria-selected="true"] {
-  background: #18181b;
-  color: #fafafa;
+  background: #0d9488;
+  color: #fff;
   box-shadow: none;
 }
 .dark .eventra-calendar-shell [data-slot="segmented-control"] {
@@ -302,8 +302,8 @@ const DAY_WEEK_ADD_EVENT_CSS = `
   color: #fafafa;
 }
 .dark .eventra-calendar-shell [data-slot="segmented-control"] button[aria-selected="true"] {
-  background: #f4f4f5;
-  color: #18181b;
+  background: #14b8a6;
+  color: #fff;
 }
 [data-slot="week-day-add-event"] {
   padding: 0.25rem;
@@ -545,6 +545,11 @@ const DAY_WEEK_ADD_EVENT_CSS = `
 [data-slot="month-view"] [data-slot="day-more-item"] [data-slot="event-time"] {
   font: inherit;
 }
+[data-slot="day-view-grid"] [data-slot="event"] [data-slot="event-time"],
+[data-slot="year-view"] [data-slot="event"] [data-slot="event-time"],
+[data-slot="year-view"] [data-slot="day-more-item"] [data-slot="event-time"] {
+  display: none;
+}
 [data-slot="month-view"] [data-slot="day-more-wrap"] {
   width: 100%;
   min-width: 0;
@@ -613,11 +618,11 @@ const DAY_WEEK_ADD_EVENT_CSS = `
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding: 0 0.15rem;
+  padding: 0 0.1rem;
   border: none !important;
   border-radius: 0.2rem;
-  font-size: 0.5rem;
-  line-height: 1.25;
+  font-size: 0.4rem;
+  line-height: 1.15;
   font-weight: 500;
   color: #18181b;
   background-image: linear-gradient(
@@ -674,7 +679,7 @@ function CalendarAddEventButton({ onClick }: { onClick: () => void }) {
       data-slot="calendar-add-event"
       onClick={onClick}
       aria-label="Add event"
-      className="relative z-10 shrink-0 bg-zinc-900 text-zinc-50 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+      className="relative z-10 shrink-0 bg-teal-600 text-white hover:bg-teal-700 dark:bg-teal-500 dark:text-white dark:hover:bg-teal-600"
     >
       <CalendarPlus className="size-4" aria-hidden />
       <span className="hidden md:inline">Add Event</span>
