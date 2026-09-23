@@ -2,6 +2,13 @@
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
   useDisconnectGoogleCalendarMutation,
@@ -19,7 +26,6 @@ import {
   SYNC_DAYS_BACK_PRESETS,
   SYNC_DAYS_FORWARD_PRESETS,
 } from "@/lib/google-calendar-sync";
-import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { CalendarSync, CheckCircle2, Loader2 } from "lucide-react";
 import Image from "next/image";
@@ -54,13 +60,6 @@ function formatOauthError(message: string | null): string {
 function resolveToken(storeToken: string | null): string | null {
   return storeToken ?? getStoredAuth()?.token ?? null;
 }
-
-const selectClassName = cn(
-  "flex h-10 w-full max-w-xs rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm shadow-none outline-none",
-  "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
-  "disabled:cursor-not-allowed disabled:opacity-50",
-  "dark:border-zinc-700 dark:bg-zinc-950",
-);
 
 export function GoogleCalendarSyncSection() {
   const router = useRouter();
@@ -270,46 +269,55 @@ export function GoogleCalendarSyncSection() {
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="google-sync-days-back">Past</Label>
-          <select
-            id="google-sync-days-back"
-            className={selectClassName}
+          <Select
+            value={String(state.syncDaysBack)}
             disabled={busy || !state.connected || !signedIn}
-            value={state.syncDaysBack}
-            onChange={(e) =>
+            onValueChange={(value) =>
               void handleWindowChange({
-                syncDaysBack: Number(e.target.value) || DEFAULT_SYNC_DAYS_BACK,
+                syncDaysBack: Number(value) || DEFAULT_SYNC_DAYS_BACK,
                 syncDaysForward: state.syncDaysForward,
               })
             }
           >
-            {SYNC_DAYS_BACK_PRESETS.map((days) => (
-              <option key={days} value={days}>
-                {days} days
-              </option>
-            ))}
-          </select>
+            <SelectTrigger id="google-sync-days-back" className="w-full max-w-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SYNC_DAYS_BACK_PRESETS.map((days) => (
+                <SelectItem key={days} value={String(days)}>
+                  {days} days
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-2">
           <Label htmlFor="google-sync-days-forward">Upcoming</Label>
-          <select
-            id="google-sync-days-forward"
-            className={selectClassName}
+          <Select
+            value={String(state.syncDaysForward)}
             disabled={busy || !state.connected || !signedIn}
-            value={state.syncDaysForward}
-            onChange={(e) =>
+            onValueChange={(value) =>
               void handleWindowChange({
                 syncDaysBack: state.syncDaysBack,
                 syncDaysForward:
-                  Number(e.target.value) || DEFAULT_SYNC_DAYS_FORWARD,
+                  Number(value) || DEFAULT_SYNC_DAYS_FORWARD,
               })
             }
           >
-            {SYNC_DAYS_FORWARD_PRESETS.map((days) => (
-              <option key={days} value={days}>
-                {days} days
-              </option>
-            ))}
-          </select>
+            <SelectTrigger
+              id="google-sync-days-forward"
+              className="w-full max-w-xs"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SYNC_DAYS_FORWARD_PRESETS.map((days) => (
+                <SelectItem key={days} value={String(days)}>
+                  {days} days
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
       <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
