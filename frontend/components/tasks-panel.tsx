@@ -200,7 +200,7 @@ export function TasksPanel({ query = "" }: { query?: string }) {
           <Button
             type="button"
             size="sm"
-            className="gap-1.5 bg-teal-600 text-white hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600"
+            className="gap-1.5"
             onClick={openCreate}
           >
             <Plus className="size-4" aria-hidden />
