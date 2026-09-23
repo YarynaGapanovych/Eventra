@@ -36,12 +36,14 @@ import {
   Bell,
   Briefcase,
   Calendar,
+  ChevronDown,
+  Globe,
   MapPin,
   Palette,
   Users,
   Video,
 } from "lucide-react";
-import { useEffect, useId, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 
 const selectClass = cn(
@@ -308,6 +310,16 @@ type Props = {
   error?: string | null;
 };
 
+function hasAdvancedContent(values: EventDetailsFormValues) {
+  return Boolean(
+    values.location.trim() ||
+      values.conferenceUrl.trim() ||
+      values.guests.length ||
+      !values.busy ||
+      values.visibility !== "default",
+  );
+}
+
 function IconRow({
   icon: Icon,
   children,
@@ -348,6 +360,10 @@ export function EventDetailsForm({
   const [showConference, setShowConference] = useState(
     Boolean(values.conferenceUrl),
   );
+  const [showAdvanced, setShowAdvanced] = useState(() =>
+    hasAdvancedContent(values),
+  );
+  const userToggledAdvanced = useRef(false);
 
   useEffect(() => {
     if (!error) return;
@@ -367,6 +383,17 @@ export function EventDetailsForm({
   useEffect(() => {
     if (values.conferenceUrl) setShowConference(true);
   }, [values.conferenceUrl]);
+
+  useEffect(() => {
+    if (userToggledAdvanced.current) return;
+    if (hasAdvancedContent(values)) setShowAdvanced(true);
+  }, [
+    values.location,
+    values.conferenceUrl,
+    values.guests.length,
+    values.busy,
+    values.visibility,
+  ]);
 
   function patch(partial: Partial<EventDetailsFormValues>) {
     onChange({ ...values, ...partial });
@@ -464,19 +491,6 @@ export function EventDetailsForm({
       </div>
 
       <div className="flex flex-wrap items-center gap-3 text-sm">
-        <select
-          aria-label="Time zone"
-          value={values.timezone}
-          onChange={(e) => patch({ timezone: e.target.value })}
-          disabled={disabled}
-          className={cn(selectClass, "max-w-full sm:max-w-xs")}
-        >
-          {zones.map((zone) => (
-            <option key={zone} value={zone}>
-              {formatTimeZoneLabel(zone)}
-            </option>
-          ))}
-        </select>
         <label className="inline-flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
           <Checkbox
             checked={values.allDay}
@@ -503,39 +517,7 @@ export function EventDetailsForm({
         </select>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_16rem]">
-        <div className="space-y-4">
-          <IconRow icon={Video}>
-            {showConference || values.conferenceUrl ? (
-              <Input
-                type="url"
-                value={values.conferenceUrl}
-                onChange={(e) => patch({ conferenceUrl: e.target.value })}
-                placeholder="Add video conferencing URL"
-                disabled={disabled}
-              />
-            ) : (
-              <Button
-                type="button"
-                variant="link"
-                className="h-auto px-0"
-                disabled={disabled}
-                onClick={() => setShowConference(true)}
-              >
-                Add video conferencing
-              </Button>
-            )}
-          </IconRow>
-
-          <IconRow icon={MapPin}>
-            <Input
-              value={values.location}
-              onChange={(e) => patch({ location: e.target.value })}
-              placeholder="Add location"
-              disabled={disabled}
-            />
-          </IconRow>
-
+      <div className="space-y-4">
           <IconRow icon={Bell}>
             <div className="space-y-2">
               {values.reminders.map((reminder, index) => (
@@ -593,46 +575,18 @@ export function EventDetailsForm({
             </div>
           </IconRow>
 
-          <IconRow icon={Palette}>
-            <div className="space-y-1">
-              <Label>Color</Label>
-              <EventColorPicker
-                value={values.color}
-                onChange={(hex) => patch({ color: hex })}
-                disabled={disabled}
-              />
-            </div>
-          </IconRow>
-
-          <IconRow icon={Briefcase}>
-            <div className="flex flex-wrap gap-2">
-              <select
-                aria-label="Busy or free"
-                value={values.busy ? "busy" : "free"}
-                disabled={disabled}
-                className={cn(selectClass, "w-28")}
-                onChange={(e) => patch({ busy: e.target.value === "busy" })}
-              >
-                <option value="busy">Busy</option>
-                <option value="free">Free</option>
-              </select>
-              <select
-                aria-label="Visibility"
-                value={values.visibility}
-                disabled={disabled}
-                className={cn(selectClass, "w-44")}
-                onChange={(e) =>
-                  patch({ visibility: e.target.value as EventVisibility })
-                }
-              >
-                {VISIBILITY_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </IconRow>
+          <div className="flex items-center gap-3">
+            <Palette
+              className="size-4 shrink-0 text-zinc-500 dark:text-zinc-400"
+              aria-hidden
+            />
+            <Label>Color</Label>
+            <EventColorPicker
+              value={values.color}
+              onChange={(hex) => patch({ color: hex })}
+              disabled={disabled}
+            />
+          </div>
 
           <IconRow icon={AlignLeft}>
             <Textarea
@@ -695,95 +649,195 @@ export function EventDetailsForm({
               </div>
             </IconRow>
           ) : null}
-        </div>
 
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Users className="size-4 text-zinc-500" aria-hidden />
-            <h3 className="text-sm font-semibold">Guests</h3>
-          </div>
-          {readOnly ? null : (
-            <div className="flex gap-2">
-              <Input
-                type="email"
-                value={guestEmail}
-                onChange={(e) => setGuestEmail(e.target.value)}
-                placeholder="Add guests"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addGuest();
-                  }
-                }}
+          <div>
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-8 px-2 text-zinc-700 dark:text-zinc-300"
+              aria-expanded={showAdvanced}
+              onClick={() => {
+                userToggledAdvanced.current = true;
+                setShowAdvanced((open) => !open);
+              }}
+            >
+              <ChevronDown
+                className={cn(
+                  "size-4 transition-transform",
+                  showAdvanced && "rotate-180",
+                )}
+                aria-hidden
               />
-              <Button type="button" variant="outline" onClick={addGuest}>
-                Add
-              </Button>
-            </div>
-          )}
-          <ul className="space-y-1">
-            {values.guests.length === 0 ? (
-              <li className="text-xs text-zinc-500">No guests yet.</li>
-            ) : (
-              values.guests.map((guest) => (
-                <li
-                  key={guest.email}
-                  className="flex items-center justify-between rounded-md bg-zinc-50 px-2 py-1 text-sm dark:bg-zinc-900"
-                >
-                  <span className="truncate">{guest.email}</span>
-                  {readOnly ? null : (
+              Advanced options
+            </Button>
+            {showAdvanced ? (
+              <div className="mt-3 space-y-4">
+                <IconRow icon={Globe}>
+                  <select
+                    aria-label="Time zone"
+                    value={values.timezone}
+                    onChange={(e) => patch({ timezone: e.target.value })}
+                    disabled={disabled}
+                    className={selectClass}
+                  >
+                    {zones.map((zone) => (
+                      <option key={zone} value={zone}>
+                        {formatTimeZoneLabel(zone)}
+                      </option>
+                    ))}
+                  </select>
+                </IconRow>
+
+                <IconRow icon={Video}>
+                  {showConference || values.conferenceUrl ? (
+                    <Input
+                      type="url"
+                      value={values.conferenceUrl}
+                      onChange={(e) => patch({ conferenceUrl: e.target.value })}
+                      placeholder="Add video conferencing URL"
+                      disabled={disabled}
+                    />
+                  ) : (
                     <Button
                       type="button"
-                      variant="ghost"
-                      size="xs"
-                      onClick={() =>
-                        patch({
-                          guests: values.guests.filter(
-                            (item) => item.email !== guest.email,
-                          ),
-                        })
-                      }
+                      variant="link"
+                      className="h-auto px-0"
+                      disabled={disabled}
+                      onClick={() => setShowConference(true)}
                     >
-                      Remove
+                      Add video conferencing
                     </Button>
                   )}
-                </li>
-              ))
-            )}
-          </ul>
-          <div className="space-y-2 pt-2 text-sm">
-            <label className="flex items-center gap-2">
-              <Checkbox
-                checked={values.guestCanModify}
-                disabled={disabled}
-                onCheckedChange={(checked) =>
-                  patch({ guestCanModify: checked === true })
-                }
-              />
-              Modify event
-            </label>
-            <label className="flex items-center gap-2">
-              <Checkbox
-                checked={values.guestCanInvite}
-                disabled={disabled}
-                onCheckedChange={(checked) =>
-                  patch({ guestCanInvite: checked === true })
-                }
-              />
-              Invite others
-            </label>
-            <label className="flex items-center gap-2">
-              <Checkbox
-                checked={values.guestCanSeeOthers}
-                disabled={disabled}
-                onCheckedChange={(checked) =>
-                  patch({ guestCanSeeOthers: checked === true })
-                }
-              />
-              See guest list
-            </label>
+                </IconRow>
+
+                <IconRow icon={MapPin}>
+                  <Input
+                    value={values.location}
+                    onChange={(e) => patch({ location: e.target.value })}
+                    placeholder="Add location"
+                    disabled={disabled}
+                  />
+                </IconRow>
+
+                <IconRow icon={Briefcase}>
+                  <div className="flex flex-wrap gap-2">
+                    <select
+                      aria-label="Busy or free"
+                      value={values.busy ? "busy" : "free"}
+                      disabled={disabled}
+                      className={cn(selectClass, "w-28")}
+                      onChange={(e) => patch({ busy: e.target.value === "busy" })}
+                    >
+                      <option value="busy">Busy</option>
+                      <option value="free">Free</option>
+                    </select>
+                    <select
+                      aria-label="Visibility"
+                      value={values.visibility}
+                      disabled={disabled}
+                      className={cn(selectClass, "w-44")}
+                      onChange={(e) =>
+                        patch({ visibility: e.target.value as EventVisibility })
+                      }
+                    >
+                      {VISIBILITY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </IconRow>
+
+                <IconRow icon={Users}>
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold">Guests</h3>
+                    {readOnly ? null : (
+                      <div className="flex gap-2">
+                        <Input
+                          type="email"
+                          value={guestEmail}
+                          onChange={(e) => setGuestEmail(e.target.value)}
+                          placeholder="Add guests"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addGuest();
+                            }
+                          }}
+                        />
+                        <Button type="button" variant="outline" onClick={addGuest}>
+                          Add
+                        </Button>
+                      </div>
+                    )}
+                    <ul className="space-y-1">
+                      {values.guests.length === 0 ? (
+                        <li className="text-xs text-zinc-500">No guests yet.</li>
+                      ) : (
+                        values.guests.map((guest) => (
+                          <li
+                            key={guest.email}
+                            className="flex items-center justify-between rounded-md bg-zinc-50 px-2 py-1 text-sm dark:bg-zinc-900"
+                          >
+                            <span className="truncate">{guest.email}</span>
+                            {readOnly ? null : (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="xs"
+                                onClick={() =>
+                                  patch({
+                                    guests: values.guests.filter(
+                                      (item) => item.email !== guest.email,
+                                    ),
+                                  })
+                                }
+                              >
+                                Remove
+                              </Button>
+                            )}
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                    <div className="space-y-2 text-sm">
+                      <label className="flex items-center gap-2">
+                        <Checkbox
+                          checked={values.guestCanModify}
+                          disabled={disabled}
+                          onCheckedChange={(checked) =>
+                            patch({ guestCanModify: checked === true })
+                          }
+                        />
+                        Modify event
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <Checkbox
+                          checked={values.guestCanInvite}
+                          disabled={disabled}
+                          onCheckedChange={(checked) =>
+                            patch({ guestCanInvite: checked === true })
+                          }
+                        />
+                        Invite others
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <Checkbox
+                          checked={values.guestCanSeeOthers}
+                          disabled={disabled}
+                          onCheckedChange={(checked) =>
+                            patch({ guestCanSeeOthers: checked === true })
+                          }
+                        />
+                        See guest list
+                      </label>
+                    </div>
+                  </div>
+                </IconRow>
+              </div>
+            ) : null}
           </div>
-        </div>
       </div>
 
       <div className="flex items-center justify-between gap-3 pt-2">

@@ -106,7 +106,7 @@ function SectionCard({
   return (
     <section
       className={cn(
-        "rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950/60",
+        "min-w-0 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5 dark:border-zinc-800 dark:bg-zinc-950/60",
         className,
       )}
     >
@@ -234,7 +234,7 @@ export default function AnalyticsPage() {
   ];
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-1">
+    <div className="mx-auto flex w-full min-w-0 max-w-7xl flex-1 flex-col gap-6 px-1">
       <header className="flex flex-col gap-4 rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:border-zinc-800 dark:bg-zinc-950/60">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
@@ -335,7 +335,7 @@ export default function AnalyticsPage() {
         </aside>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-12">
+      <section className="grid min-w-0 gap-4 xl:grid-cols-12">
         <SectionCard
           title="Peak hours"
           subtitle={`How full each weekday hour is · ${settings.workdayStart}–${settings.workdayEnd}`}
@@ -345,25 +345,25 @@ export default function AnalyticsPage() {
             <LoadingState message="Loading schedule…" />
           ) : (
             <>
-              <div className="overflow-x-auto">
+              <div className="min-w-0 overflow-x-auto overflow-y-hidden">
                 <div
-                  className="grid min-w-md gap-1"
+                  className="grid w-full gap-0.5 sm:gap-1"
                   style={{
-                    gridTemplateColumns: `2.5rem repeat(${Math.max(peakHours.hours.length, 1)}, minmax(0, 1fr))`,
+                    gridTemplateColumns: `2rem repeat(${Math.max(peakHours.hours.length, 1)}, minmax(0, 1fr))`,
                   }}
                 >
                   <div />
                   {peakHours.hours.map((hour) => (
                     <div
                       key={hour}
-                      className="text-center text-[10px] font-medium text-zinc-500 dark:text-zinc-400"
+                      className="truncate text-center text-[9px] font-medium text-zinc-500 sm:text-[10px] dark:text-zinc-400"
                     >
                       {hour}
                     </div>
                   ))}
                   {peakHours.weekdays.map((day, dayIndex) => (
                     <div key={day} className="contents">
-                      <div className="flex items-center text-xs font-medium text-zinc-600 dark:text-zinc-300">
+                      <div className="flex items-center truncate text-[10px] font-medium text-zinc-600 sm:text-xs dark:text-zinc-300">
                         {day}
                       </div>
                       {peakHours.hours.map((hour, hourIndex) => {
@@ -373,7 +373,7 @@ export default function AnalyticsPage() {
                             key={`${day}-${hour}`}
                             title={`${day} ${hourLabel(hour)}–${hourLabel(hour + 1)} · ${minutes}m booked`}
                             className={cn(
-                              "h-8 rounded-sm border border-zinc-200/60 dark:border-zinc-800",
+                              "h-6 rounded-sm border border-zinc-200/60 sm:h-8 dark:border-zinc-800",
                               minutes <= 0 && "bg-zinc-100 dark:bg-zinc-800",
                             )}
                             style={minutes > 0 ? { backgroundColor: heatColor(minutes) } : undefined}
@@ -405,8 +405,10 @@ export default function AnalyticsPage() {
                   key={item.title}
                   className="rounded-xl border border-zinc-200/80 p-3 dark:border-zinc-800"
                 >
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{item.title}</p>
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                    <p className="min-w-0 wrap-break-word text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                      {item.title}
+                    </p>
                     <span className="text-xs text-zinc-500 dark:text-zinc-400">
                       {item.count}× · {formatHours(item.hours)}
                     </span>

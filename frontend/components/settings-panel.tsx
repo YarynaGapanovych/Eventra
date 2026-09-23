@@ -4,6 +4,13 @@ import { GoogleCalendarSyncSection } from "@/components/google-calendar-sync-sec
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
   useUpdateUserSettingsMutation,
@@ -16,12 +23,11 @@ import {
   normalizeSettingsPartial,
   type AppSettings,
 } from "@/lib/app-settings";
-import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod/v3";
 
@@ -224,7 +230,7 @@ export function SettingsPanel() {
                 list="iana-timezones"
                 autoComplete="off"
                 disabled={fieldsDisabled}
-                className="font-mono text-sm"
+                className="h-11 font-mono text-sm"
                 placeholder="e.g. Europe/Warsaw"
                 aria-invalid={!!formState.errors.timezone}
                 {...register("timezone")}
@@ -244,21 +250,30 @@ export function SettingsPanel() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="settings-week-start">Week starts on</Label>
-              <select
-                id="settings-week-start"
-                disabled={fieldsDisabled}
-                aria-invalid={!!formState.errors.weekStartsOn}
-                className={cn(
-                  "flex h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm shadow-none outline-none",
-                  "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
-                  "disabled:cursor-not-allowed disabled:opacity-50",
-                  "dark:border-zinc-700 dark:bg-zinc-950",
+              <Controller
+                control={form.control}
+                name="weekStartsOn"
+                render={({ field }) => (
+                  <Select
+                    value={String(field.value)}
+                    onValueChange={(value) => field.onChange(Number(value))}
+                    disabled={fieldsDisabled}
+                  >
+                    <SelectTrigger
+                      id="settings-week-start"
+                      className="w-full"
+                      aria-invalid={!!formState.errors.weekStartsOn}
+                      onBlur={field.onBlur}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Monday</SelectItem>
+                      <SelectItem value="0">Sunday</SelectItem>
+                    </SelectContent>
+                  </Select>
                 )}
-                {...register("weekStartsOn", { valueAsNumber: true })}
-              >
-                <option value={1}>Monday</option>
-                <option value={0}>Sunday</option>
-              </select>
+              />
               {formState.errors.weekStartsOn ? (
                 <p className="text-xs text-red-600 dark:text-red-400">
                   {formState.errors.weekStartsOn.message}
@@ -277,29 +292,38 @@ export function SettingsPanel() {
           </p>
           <div className="mt-4 space-y-2">
             <Label htmlFor="settings-duration">Length</Label>
-            <select
-              id="settings-duration"
-              disabled={fieldsDisabled}
-              aria-invalid={!!formState.errors.defaultEventDurationMinutes}
-              className={cn(
-                "flex h-10 w-full max-w-xs rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm shadow-none outline-none",
-                "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
-                "disabled:cursor-not-allowed disabled:opacity-50",
-                "dark:border-zinc-700 dark:bg-zinc-950",
-                formState.errors.defaultEventDurationMinutes &&
-                  "border-destructive ring-3 ring-destructive/20 dark:border-destructive/50 dark:ring-destructive/40",
+            <Controller
+              control={form.control}
+              name="defaultEventDurationMinutes"
+              render={({ field }) => (
+                <Select
+                  value={
+                    typeof field.value === "number"
+                      ? String(field.value)
+                      : undefined
+                  }
+                  onValueChange={(value) => field.onChange(Number(value))}
+                  disabled={fieldsDisabled}
+                >
+                  <SelectTrigger
+                    id="settings-duration"
+                    className="w-full max-w-xs"
+                    aria-invalid={!!formState.errors.defaultEventDurationMinutes}
+                    onBlur={field.onBlur}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {durationOpts.map((m) => (
+                      <SelectItem key={m} value={String(m)}>
+                        {m} minutes
+                        {m === 60 ? " (1 hr)" : m === 120 ? " (2 hr)" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
-              {...register("defaultEventDurationMinutes", {
-                valueAsNumber: true,
-              })}
-            >
-              {durationOpts.map((m) => (
-                <option key={m} value={m}>
-                  {m} minutes
-                  {m === 60 ? " (1 hr)" : m === 120 ? " (2 hr)" : ""}
-                </option>
-              ))}
-            </select>
+            />
             {formState.errors.defaultEventDurationMinutes ? (
               <p className="text-xs text-red-600 dark:text-red-400">
                 {formState.errors.defaultEventDurationMinutes.message}
