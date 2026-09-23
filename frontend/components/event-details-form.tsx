@@ -306,6 +306,7 @@ type Props = {
   readOnly?: boolean;
   showTaskFields?: boolean;
   timesOptional?: boolean;
+  hideCalendarExtras?: boolean;
   submitting?: boolean;
   error?: string | null;
 };
@@ -351,6 +352,7 @@ export function EventDetailsForm({
   readOnly = false,
   showTaskFields = false,
   timesOptional = false,
+  hideCalendarExtras = false,
   submitting = false,
   error = null,
 }: Props) {
@@ -435,6 +437,81 @@ export function EventDetailsForm({
 
   const disabled = readOnly || submitting;
 
+  const repeatSelect = (
+    <select
+      aria-label="Repeat"
+      value={customRecurrence ? values.recurrence : recurrenceValue}
+      onChange={(e) => patch({ recurrence: e.target.value })}
+      disabled={disabled}
+      className={cn(selectClass, "max-w-full sm:max-w-xs")}
+    >
+      {recurrenceChoices.map((option) => (
+        <option key={option.value || "none"} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+      {customRecurrence ? (
+        <option value={values.recurrence}>Custom</option>
+      ) : null}
+    </select>
+  );
+
+  const notificationRow = (
+    <IconRow icon={Bell}>
+      <div className="space-y-2">
+        {values.reminders.map((reminder, index) => (
+          <div key={`${reminder.minutesBefore}-${index}`} className="flex gap-2">
+            <select
+              aria-label={`Reminder ${index + 1}`}
+              value={reminder.minutesBefore}
+              disabled={disabled}
+              className={selectClass}
+              onChange={(e) => {
+                const next = [...values.reminders];
+                next[index] = { minutesBefore: Number(e.target.value) };
+                patch({ reminders: next });
+              }}
+            >
+              {REMINDER_PRESETS.map((preset) => (
+                <option key={preset.minutes} value={preset.minutes}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
+            {readOnly ? null : (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  patch({
+                    reminders: values.reminders.filter((_, i) => i !== index),
+                  })
+                }
+              >
+                Remove
+              </Button>
+            )}
+          </div>
+        ))}
+        {readOnly ? null : (
+          <Button
+            type="button"
+            variant="link"
+            className="h-auto px-0"
+            onClick={() =>
+              patch({
+                reminders: [...values.reminders, { minutesBefore: 10 }],
+              })
+            }
+          >
+            Add notification
+          </Button>
+        )}
+      </div>
+    </IconRow>
+  );
+
   return (
     <form className="space-y-4" onSubmit={(e) => void handleSubmit(e)}>
       <Input
@@ -447,6 +524,7 @@ export function EventDetailsForm({
         className="h-10 border-0 border-b border-zinc-200 bg-transparent px-0 text-lg font-medium rounded-none shadow-none focus-visible:ring-0 dark:border-zinc-700"
       />
 
+      {hideCalendarExtras ? null : (
       <div className="flex flex-wrap items-center gap-2">
         <Input
           type="date"
@@ -489,7 +567,9 @@ export function EventDetailsForm({
           className={pillClass}
         />
       </div>
+      )}
 
+      {hideCalendarExtras ? null : (
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <label className="inline-flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
           <Checkbox
@@ -499,82 +579,14 @@ export function EventDetailsForm({
           />
           All day
         </label>
-        <select
-          aria-label="Repeat"
-          value={customRecurrence ? values.recurrence : recurrenceValue}
-          onChange={(e) => patch({ recurrence: e.target.value })}
-          disabled={disabled}
-          className={cn(selectClass, "max-w-full sm:max-w-xs")}
-        >
-          {recurrenceChoices.map((option) => (
-            <option key={option.value || "none"} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-          {customRecurrence ? (
-            <option value={values.recurrence}>Custom</option>
-          ) : null}
-        </select>
+        {repeatSelect}
       </div>
+      )}
 
       <div className="space-y-4">
-          <IconRow icon={Bell}>
-            <div className="space-y-2">
-              {values.reminders.map((reminder, index) => (
-                <div key={`${reminder.minutesBefore}-${index}`} className="flex gap-2">
-                  <select
-                    aria-label={`Reminder ${index + 1}`}
-                    value={reminder.minutesBefore}
-                    disabled={disabled}
-                    className={selectClass}
-                    onChange={(e) => {
-                      const next = [...values.reminders];
-                      next[index] = { minutesBefore: Number(e.target.value) };
-                      patch({ reminders: next });
-                    }}
-                  >
-                    {REMINDER_PRESETS.map((preset) => (
-                      <option key={preset.minutes} value={preset.minutes}>
-                        {preset.label}
-                      </option>
-                    ))}
-                  </select>
-                  {readOnly ? null : (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        patch({
-                          reminders: values.reminders.filter((_, i) => i !== index),
-                        })
-                      }
-                    >
-                      Remove
-                    </Button>
-                  )}
-                </div>
-              ))}
-              {readOnly ? null : (
-                <Button
-                  type="button"
-                  variant="link"
-                  className="h-auto px-0"
-                  onClick={() =>
-                    patch({
-                      reminders: [
-                        ...values.reminders,
-                        { minutesBefore: 10 },
-                      ],
-                    })
-                  }
-                >
-                  Add notification
-                </Button>
-              )}
-            </div>
-          </IconRow>
+          {hideCalendarExtras ? null : notificationRow}
 
+          {hideCalendarExtras ? null : (
           <div className="flex items-center gap-3">
             <Palette
               className="size-4 shrink-0 text-zinc-500 dark:text-zinc-400"
@@ -587,6 +599,7 @@ export function EventDetailsForm({
               disabled={disabled}
             />
           </div>
+          )}
 
           <IconRow icon={AlignLeft}>
             <Textarea
@@ -650,6 +663,15 @@ export function EventDetailsForm({
             </IconRow>
           ) : null}
 
+          {hideCalendarExtras ? (
+            <>
+              <div className="flex flex-wrap items-center gap-3 text-sm">
+                {repeatSelect}
+              </div>
+              {notificationRow}
+            </>
+          ) : null}
+
           <div>
             <Button
               type="button"
@@ -688,6 +710,7 @@ export function EventDetailsForm({
                   </select>
                 </IconRow>
 
+                {hideCalendarExtras ? null : (
                 <IconRow icon={Video}>
                   {showConference || values.conferenceUrl ? (
                     <Input
@@ -709,6 +732,7 @@ export function EventDetailsForm({
                     </Button>
                   )}
                 </IconRow>
+                )}
 
                 <IconRow icon={MapPin}>
                   <Input
@@ -719,6 +743,7 @@ export function EventDetailsForm({
                   />
                 </IconRow>
 
+                {hideCalendarExtras ? null : (
                 <IconRow icon={Briefcase}>
                   <div className="flex flex-wrap gap-2">
                     <select
@@ -748,7 +773,9 @@ export function EventDetailsForm({
                     </select>
                   </div>
                 </IconRow>
+                )}
 
+                {hideCalendarExtras ? null : (
                 <IconRow icon={Users}>
                   <div className="space-y-3">
                     <h3 className="text-sm font-semibold">Guests</h3>
@@ -835,6 +862,7 @@ export function EventDetailsForm({
                     </div>
                   </div>
                 </IconRow>
+                )}
               </div>
             ) : null}
           </div>

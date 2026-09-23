@@ -336,6 +336,7 @@ export function TaskEditDialog({
             submitLabel={mode === "create" ? "Create" : "Save"}
             showTaskFields
             timesOptional
+            hideCalendarExtras={mode === "create"}
             submitting={submitting}
             error={error}
           />
