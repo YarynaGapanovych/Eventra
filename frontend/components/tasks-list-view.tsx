@@ -219,7 +219,7 @@ export function TasksListView({ tasks, onEdit, onDelete, deletingId }: Props) {
   });
 
   return (
-    <div className="rounded-xl border border-zinc-200/80 bg-white/80 shadow-sm dark:border-zinc-800 dark:bg-zinc-950/60">
+    <div className="overflow-hidden rounded-xl border border-zinc-200/80 bg-white/80 shadow-sm dark:border-zinc-800 dark:bg-zinc-950/60">
       <Table className="min-w-[620px]">
         <TableHeader>
           <TableRow className="bg-zinc-50/90 text-xs font-medium uppercase tracking-wide text-zinc-500 hover:bg-zinc-50/90 dark:bg-zinc-900/50 dark:text-zinc-400 dark:hover:bg-zinc-900/50">
