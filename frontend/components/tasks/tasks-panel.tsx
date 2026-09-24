@@ -1,8 +1,8 @@
 "use client";
 
-import { TaskEditDialog } from "@/components/task-edit-dialog";
-import { TasksKanbanView } from "@/components/tasks-kanban-view";
-import { TasksListView } from "@/components/tasks-list-view";
+import { TaskEditDialog } from "@/components/tasks/task-edit-dialog";
+import { TasksKanbanView } from "@/components/tasks/tasks-kanban-view";
+import { TasksListView } from "@/components/tasks/tasks-list-view";
 import { Button } from "@/components/ui/button";
 import { useDeleteTaskMutation, useTasksQuery, useUpdateTaskMutation } from "@/hooks/use-tasks";
 import { parseMasterEventId } from "@/lib/calendar-details";

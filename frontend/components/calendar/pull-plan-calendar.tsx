@@ -1,12 +1,12 @@
 "use client";
 
-import { CalendarCreateEventModal } from "@/components/calendar-create-event-modal";
-import { CalendarEventDetailModal } from "@/components/calendar-event-detail-modal";
-import { OverlapConfirmDialog } from "@/components/overlap-confirm-dialog";
+import { CalendarCreateEventModal } from "@/components/calendar/calendar-create-event-modal";
+import { CalendarEventDetailModal } from "@/components/calendar/calendar-event-detail-modal";
+import { OverlapConfirmDialog } from "@/components/calendar/overlap-confirm-dialog";
 import {
   EventCreateColorProvider,
   useEventCreateDraft,
-} from "@/components/event-create-color-context";
+} from "@/components/calendar/event-create-color-context";
 import { Button } from "@/components/ui/button";
 import {
   useCreateEventMutation,
@@ -484,7 +484,7 @@ const DAY_WEEK_ADD_EVENT_CSS = `
   min-width: 0;
   flex: 1;
   overflow: hidden;
-  text-overflow: ellipsis;
+  text-overflow: clip;
   white-space: nowrap;
 }
 [data-slot="month-view"] [data-slot="week-day-events"] [data-slot="event"] button {
@@ -514,11 +514,13 @@ const DAY_WEEK_ADD_EVENT_CSS = `
   line-height: 1.25;
   color: #fff !important;
 }
+[data-slot="week-view"] [data-slot="event"],
+[data-slot="week-view"] [data-slot="event"] span,
 [data-slot="week-view-grid"] [data-slot="event"] > span {
   min-width: 0;
   flex: 1;
   overflow: hidden;
-  text-overflow: ellipsis;
+  text-overflow: clip !important;
   white-space: nowrap;
 }
 [data-slot="week-view-grid"] [data-slot="event"] button {
@@ -668,6 +670,89 @@ const DAY_WEEK_ADD_EVENT_CSS = `
     rgb(24 24 27 / 0.38),
     rgb(24 24 27 / 0.38)
   );
+}
+@media (max-width: 767px) {
+  [data-slot="month-view-weekdays"] {
+    gap: 0;
+    padding: 0.15rem 0;
+    margin-bottom: 0;
+    font-size: 0.625rem;
+  }
+  [data-slot="month-view-weeks"] {
+    gap: 0;
+  }
+  [data-slot="month-week"] {
+    min-height: 0;
+  }
+  [data-slot="month-view"] [data-slot="week-days"] {
+    gap: 0;
+    min-height: 0;
+  }
+  [data-slot="month-view"] [data-slot="week-day-cell"] {
+    padding: 0.15rem 0.1rem 0.2rem;
+    border-radius: 0;
+    border: none;
+    border-bottom: 1px solid #f3f4f6;
+    border-right: 1px solid #f3f4f6;
+    box-shadow: none;
+    min-height: 4.5rem;
+  }
+  [data-slot="month-view"] [data-slot="week-day-spacer"] {
+    border-radius: 0;
+    border: none;
+    border-bottom: 1px solid #f3f4f6;
+    border-right: 1px solid #f3f4f6;
+    box-shadow: none;
+  }
+  [data-slot="month-view"] [data-slot="week-day"] {
+    align-items: flex-start;
+    padding: 0 0.7rem 0 0;
+  }
+  [data-slot="month-view"] [data-slot="week-day"] span {
+    font-size: 0.7rem;
+    font-weight: 500;
+  }
+  [data-slot="month-view"] [data-slot="week-day"] button {
+    top: 0;
+    right: 0;
+    padding: 0;
+    font-size: 0.75rem;
+  }
+  [data-slot="month-view"] [data-slot="week-day-events"] {
+    margin-top: 0.1rem;
+    gap: 1px;
+  }
+  [data-slot="day-view"] [data-slot="event"] button,
+  [data-slot="week-view"] [data-slot="event"] button {
+    display: none !important;
+  }
+  [data-slot="month-view"] [data-slot="week-day-events"] [data-slot="event"],
+  [data-slot="month-view"] [data-slot="day-more-item"] {
+    display: block;
+    min-height: 0;
+    padding: 0.15rem 0.4rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.25;
+    color: #fff;
+    overflow: hidden;
+    text-overflow: clip;
+    white-space: nowrap;
+  }
+  [data-slot="month-view"] [data-slot="event"] [data-slot="event-time"],
+  [data-slot="month-view"] [data-slot="day-more-item"] [data-slot="event-time"] {
+    display: none;
+  }
+  [data-slot="month-view"] [data-slot="day-more"] {
+    font-size: 0.625rem;
+    padding: 0 2px;
+  }
+  .dark [data-slot="month-view"] [data-slot="week-day-cell"],
+  .dark [data-slot="month-view"] [data-slot="week-day-spacer"] {
+    border-bottom-color: #3f3f46;
+    border-right-color: #3f3f46;
+  }
 }
 `.trim();
 

@@ -1,8 +1,8 @@
-import { AppAuthGate } from "@/components/app-auth-gate";
-import { AppBottomNav } from "@/components/app-bottom-nav";
-import { AppSidebar } from "@/components/app-sidebar";
-import { FreeHostingWakeBanner } from "@/components/free-hosting-wake-banner";
-import { SiteHeader } from "@/components/site-header";
+import { AppAuthGate } from "@/components/layout/app-auth-gate";
+import { AppBottomNav } from "@/components/layout/app-bottom-nav";
+import { AppSidebar } from "@/components/layout/app-sidebar";
+import { FreeHostingWakeBanner } from "@/components/layout/free-hosting-wake-banner";
+import { SiteHeader } from "@/components/layout/site-header";
 import { GoogleCalendarLiveSync } from "@/hooks/use-google-calendar-live-sync";
 
 export default function AppLayout({

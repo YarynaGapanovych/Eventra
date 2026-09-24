@@ -1,6 +1,6 @@
 "use client";
 
-import { appNavItems, isAppNavActive } from "@/components/app-nav-items";
+import { appNavItems, isAppNavActive } from "@/components/layout/app-nav-items";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";

@@ -6,7 +6,7 @@ import {
   formValuesToPayload,
   taskToFormValues,
   type EventDetailsFormValues,
-} from "@/components/event-details-form";
+} from "@/components/calendar/event-details-form";
 import { Button } from "@/components/ui/button";
 import { useDeleteEventMutation, useEventsQuery, useUpdateEventMutation } from "@/hooks/use-events";
 import { useDeleteTaskMutation, useTasksQuery, useUpdateTaskMutation } from "@/hooks/use-tasks";

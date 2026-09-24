@@ -1,7 +1,7 @@
 "use client";
 
-import { AuthSplitLayout } from "@/components/auth-split-layout";
-import { ResetPasswordForm } from "@/components/reset-password-form";
+import { AuthSplitLayout } from "@/components/auth/auth-split-layout";
+import { ResetPasswordForm } from "@/components/auth/reset-password-form";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 

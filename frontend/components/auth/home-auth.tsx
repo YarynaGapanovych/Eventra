@@ -1,9 +1,9 @@
 "use client";
 
-import { AuthSplitLayout } from "@/components/auth-split-layout";
-import { ForgotPasswordForm } from "@/components/forgot-password-form";
-import { LoginForm } from "@/components/login-form";
-import { RegisterForm } from "@/components/register-form";
+import { AuthSplitLayout } from "@/components/auth/auth-split-layout";
+import { ForgotPasswordForm } from "@/components/auth/forgot-password-form";
+import { LoginForm } from "@/components/auth/login-form";
+import { RegisterForm } from "@/components/auth/register-form";
 import { useAuthStore } from "@/stores/auth-store";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";

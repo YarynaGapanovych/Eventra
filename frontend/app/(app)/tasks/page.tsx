@@ -1,4 +1,4 @@
-import { TasksPanel } from "@/components/tasks-panel";
+import { TasksPanel } from "@/components/tasks/tasks-panel";
 
 export default async function TasksPage({
   searchParams,

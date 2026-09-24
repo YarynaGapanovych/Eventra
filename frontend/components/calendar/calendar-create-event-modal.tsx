@@ -1,7 +1,7 @@
 "use client";
 
-import { EventDetailsForm, defaultFormValues, formValuesToPayload, type EventDetailsFormValues } from "@/components/event-details-form";
-import { useEventCreateDraft } from "@/components/event-create-color-context";
+import { EventDetailsForm, defaultFormValues, formValuesToPayload, type EventDetailsFormValues } from "@/components/calendar/event-details-form";
+import { useEventCreateDraft } from "@/components/calendar/event-create-color-context";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { isoToZonedParts } from "@/lib/calendar-details";
