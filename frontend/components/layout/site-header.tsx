@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import { AssistantChat } from "@/components/assistant-chat";
-import { NotificationsCenter } from "@/components/notifications-center";
+import { AssistantChat } from "@/components/layout/assistant-chat";
+import { NotificationsCenter } from "@/components/layout/notifications-center";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/stores/auth-store";
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { SettingsPanel } from "@/components/settings-panel";
+import { SettingsPanel } from "@/components/settings/settings-panel";
 import { Suspense } from "react";
 
 export default function SettingsPage() {

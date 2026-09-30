@@ -1,4 +1,4 @@
-import { HomeAuth } from "@/components/home-auth";
+import { HomeAuth } from "@/components/auth/home-auth";
 
 export default function HomePage() {
   return (

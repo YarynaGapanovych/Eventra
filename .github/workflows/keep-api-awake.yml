@@ -1,10 +1,9 @@
 name: Keep Render API awake
 
+# Manual ping only. GitHub drops frequent schedules, so this workflow
+# cannot keep the Render free service awake. The live ping is a
+# cron-job.org job: GET /health every 5 minutes.
 on:
-  schedule:
-    # Render free web services spin down after 15 minutes with no inbound HTTP.
-    # Ping /health every 10 minutes from GitHub so the idle timer resets.
-    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 jobs:

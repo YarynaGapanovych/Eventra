@@ -1,6 +1,6 @@
 "use client";
 
-import { appNavItems, isAppNavActive } from "@/components/app-nav-items";
+import { appNavItems, isAppNavActive } from "@/components/layout/app-nav-items";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { usePathname } from "next/navigation";

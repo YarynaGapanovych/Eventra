@@ -1,6 +1,6 @@
 "use client";
 
-import { EventColorPicker } from "@/components/event-color-picker";
+import { EventColorPicker } from "@/components/calendar/event-color-picker";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
