@@ -4,10 +4,14 @@ import { TaskEditDialog } from "@/components/tasks/task-edit-dialog";
 import { TasksKanbanView } from "@/components/tasks/tasks-kanban-view";
 import { TasksListView } from "@/components/tasks/tasks-list-view";
 import { Button } from "@/components/ui/button";
-import { useDeleteTaskMutation, useTasksQuery, useUpdateTaskMutation } from "@/hooks/use-tasks";
+import {
+  useDeleteTaskMutation,
+  useTasksQuery,
+  useUpdateTaskMutation,
+} from "@/hooks/use-tasks";
+import { getStoredAuth } from "@/lib/auth-api";
 import { parseMasterEventId } from "@/lib/calendar-details";
 import { syncEntityReminders } from "@/lib/reminder-storage";
-import { getStoredAuth } from "@/lib/auth-api";
 import {
   isMockTaskId,
   TASK_PRIORITY_LABELS,
@@ -114,7 +118,9 @@ export function TasksPanel({ query = "" }: { query?: string }) {
   }
 
   function removePersistedTask(taskId: string) {
-    setLocalTasks((prev) => (prev ?? queryTasks).filter((t) => t.id !== taskId));
+    setLocalTasks((prev) =>
+      (prev ?? queryTasks).filter((t) => t.id !== taskId),
+    );
   }
 
   function clearTaskReminders(task: ApiTask) {
@@ -152,14 +158,6 @@ export function TasksPanel({ query = "" }: { query?: string }) {
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        {/* <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Tasks
-          </h1>
-          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            List or board view. Drag cards between columns to update status.
-          </p>
-        </div> */}
         <div className="flex flex-wrap items-center gap-2">
           <div
             className="flex items-center gap-1"
@@ -252,7 +250,9 @@ export function TasksPanel({ query = "" }: { query?: string }) {
           tasks={filteredTasks}
           onEdit={openEdit}
           onDelete={handleDelete}
-          deletingId={deleteTaskMutation.isPending ? deleteTaskMutation.variables : null}
+          deletingId={
+            deleteTaskMutation.isPending ? deleteTaskMutation.variables : null
+          }
         />
       ) : (
         <TasksKanbanView

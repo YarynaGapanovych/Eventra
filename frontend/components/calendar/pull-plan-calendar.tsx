@@ -672,6 +672,15 @@ const DAY_WEEK_ADD_EVENT_CSS = `
   );
 }
 @media (max-width: 767px) {
+  [data-slot="week-view"] [data-slot="week-day-cell"] {
+    padding-right: 0.5rem !important;
+  }
+  [data-slot="week-view"] [data-slot="week-day-cell"] [data-slot="week-day-add-event"] {
+    display: none;
+  }
+  [data-slot="week-view"] [data-slot="event"] [data-slot="event-time"] {
+    display: none;
+  }
   [data-slot="month-view-weekdays"] {
     gap: 0;
     padding: 0.15rem 0;
