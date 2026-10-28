@@ -2,6 +2,7 @@
 
 import { CalendarCreateEventModal } from "@/components/calendar/calendar-create-event-modal";
 import { CalendarEventDetailModal } from "@/components/calendar/calendar-event-detail-modal";
+import { DayPreviewDialog } from "@/components/calendar/day-preview-dialog";
 import { OverlapConfirmDialog } from "@/components/calendar/overlap-confirm-dialog";
 import {
   EventCreateColorProvider,
@@ -108,6 +109,16 @@ const DAY_WEEK_ADD_EVENT_CSS = `
 [data-slot="month-view-nav"] [data-slot="calendar-add-event"],
 [data-slot="year-view-nav"] [data-slot="calendar-add-event"] {
   display: none;
+}
+[data-slot="week-view"] [data-slot="week-day-cell"],
+[data-slot="month-view"] [data-slot="week-day-cell"] {
+  cursor: pointer;
+}
+[data-slot="week-view"] [data-slot="week-day-cell"] {
+  transition: background-color 120ms ease;
+}
+[data-slot="week-view"] [data-slot="week-day-cell"]:hover {
+  background-color: rgb(15 118 110 / 0.06);
 }
 .eventra-calendar-shell {
   display: grid;
@@ -471,7 +482,6 @@ const DAY_WEEK_ADD_EVENT_CSS = `
   font-size: 0.75rem;
   line-height: 1.25;
   font-weight: 500;
-  color: #fff !important;
   background: var(--event-color, #b1724b);
   background-image: none;
 }
@@ -512,7 +522,6 @@ const DAY_WEEK_ADD_EVENT_CSS = `
   font-size: 0.75rem;
   font-weight: 500;
   line-height: 1.25;
-  color: #fff !important;
 }
 [data-slot="week-view"] [data-slot="event"],
 [data-slot="week-view"] [data-slot="event"] span,
@@ -744,7 +753,6 @@ const DAY_WEEK_ADD_EVENT_CSS = `
     font-size: 0.75rem;
     font-weight: 500;
     line-height: 1.25;
-    color: #fff;
     overflow: hidden;
     text-overflow: clip;
     white-space: nowrap;
@@ -762,6 +770,45 @@ const DAY_WEEK_ADD_EVENT_CSS = `
     border-bottom-color: #3f3f46;
     border-right-color: #3f3f46;
   }
+}
+/* Tinted event cards: the library paints event.color as an inline solid
+   background; a translucent overlay turns it into a tint, and ::before
+   inherits the solid color for the left stripe. */
+.eventra-calendar-shell :is([data-slot="event"], [data-slot="day-more-item"], [data-slot="unscheduled-event"]) {
+  position: relative;
+  overflow: hidden;
+  border: none !important;
+  border-radius: 0.375rem !important;
+  padding-left: 0.6rem !important;
+  color: #18181b !important;
+  background-image: linear-gradient(
+    rgb(255 255 255 / 0.78),
+    rgb(255 255 255 / 0.78)
+  ) !important;
+}
+.eventra-calendar-shell :is([data-slot="event"], [data-slot="day-more-item"], [data-slot="unscheduled-event"])::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 4px;
+  background-color: inherit;
+  pointer-events: none;
+}
+.eventra-calendar-shell [data-slot="year-view"] :is([data-slot="event"], [data-slot="day-more-item"]) {
+  padding-left: 0.2rem !important;
+  border-radius: 0.2rem !important;
+}
+.eventra-calendar-shell [data-slot="year-view"] :is([data-slot="event"], [data-slot="day-more-item"])::before {
+  width: 2px;
+}
+.dark .eventra-calendar-shell :is([data-slot="event"], [data-slot="day-more-item"], [data-slot="unscheduled-event"]) {
+  color: #fafafa !important;
+  background-image: linear-gradient(
+    rgb(9 9 11 / 0.7),
+    rgb(9 9 11 / 0.7)
+  ) !important;
 }
 `.trim();
 
@@ -1003,6 +1050,9 @@ function PullPlanCalendarView() {
   } | null>(null);
   const overlapResolverRef = useRef<((ok: boolean) => void) | null>(null);
   const calendarRootRef = useRef<HTMLDivElement>(null);
+  const [previewDate, setPreviewDate] = useState<Dayjs | null>(null);
+  const [detailEvent, setDetailEvent] = useState<CalendarEvent | null>(null);
+  const [createStart, setCreateStart] = useState<Dayjs | null>(null);
   const settingsQuery = useUserSettingsQuery();
   const durationMinutes =
     settingsQuery.data?.defaultEventDurationMinutes ??
@@ -1062,6 +1112,46 @@ function PullPlanCalendarView() {
 
   const { getDraft, setDraft } = useEventCreateDraft();
   const unscheduledKey = unscheduledEvents.map((event) => event.id).join(",");
+
+  const previewEvents = useMemo(() => {
+    if (!previewDate) return [];
+    const dayStart = previewDate.startOf("day");
+    const dayEnd = dayStart.add(1, "day");
+    return scheduledEvents.filter(
+      (event) =>
+        dayjs(event.start).isBefore(dayEnd) && dayjs(event.end).isAfter(dayStart),
+    );
+  }, [previewDate, scheduledEvents]);
+
+  const closePreview = useCallback(() => setPreviewDate(null), []);
+
+  useEffect(() => {
+    const root = calendarRootRef.current;
+    if (!root) return;
+    function onClick(event: MouseEvent) {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const cell = target.closest('[data-slot="week-day-cell"][data-date]');
+      if (!cell) return;
+      if (cell.closest('[data-slot="month-view"]')) {
+        if (
+          target.closest(
+            'button, [data-slot="event"], [data-slot="day-more"], [data-slot="day-more-item"]',
+          )
+        ) {
+          return;
+        }
+      } else if (cell.closest('[data-slot="week-view"]')) {
+        if (target.closest('[data-slot="week-day-add-event"]')) return;
+      } else {
+        return;
+      }
+      const dateKey = cell.getAttribute("data-date");
+      if (dateKey) setPreviewDate(dayjs(dateKey));
+    }
+    root.addEventListener("click", onClick);
+    return () => root.removeEventListener("click", onClick);
+  }, []);
 
   function settleOverlapPrompt(ok: boolean) {
     overlapResolverRef.current?.(ok);
@@ -1284,6 +1374,42 @@ function PullPlanCalendarView() {
       />
       )}
       </div>
+      <DayPreviewDialog
+        date={previewDate}
+        events={previewEvents}
+        scrollToHour={applyWorkdayStart(dayjs(), workdayStart).hour()}
+        onClose={closePreview}
+        onEventOpen={setDetailEvent}
+        onAdd={(day) => setCreateStart(applyWorkdayStart(day, workdayStart))}
+      />
+      {detailEvent
+        ? createPortal(
+            <CalendarEventDetailModal
+              task={mapCalendarEventToLibraryTask(detailEvent)}
+              isOpen
+              onClose={() => setDetailEvent(null)}
+            />,
+            document.body,
+          )
+        : null}
+      {createStart
+        ? createPortal(
+            <CalendarCreateEventModal
+              isOpen
+              initialStartDate={createStart}
+              onClose={() => setCreateStart(null)}
+              onSubmit={async (data) => {
+                await handleEventCreate({
+                  id: "",
+                  title: data.name,
+                  start: data.startDate,
+                  end: data.endDate,
+                });
+              }}
+            />,
+            document.body,
+          )
+        : null}
       <OverlapConfirmDialog
         open={overlapPrompt !== null}
         titles={overlapPrompt?.titles ?? []}
