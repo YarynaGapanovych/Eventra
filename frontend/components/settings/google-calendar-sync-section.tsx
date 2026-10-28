@@ -26,7 +26,9 @@ import {
   SYNC_DAYS_BACK_PRESETS,
   SYNC_DAYS_FORWARD_PRESETS,
 } from "@/lib/google-calendar-sync";
+import { queryKeys } from "@/lib/query-keys";
 import { useAuthStore } from "@/stores/auth-store";
+import { useQueryClient } from "@tanstack/react-query";
 import { CalendarSync, CheckCircle2, Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -70,6 +72,7 @@ export function GoogleCalendarSyncSection() {
   const signedIn = Boolean(token);
   const authPending = !hydrated;
 
+  const queryClient = useQueryClient();
   const statusQuery = useGoogleCalendarStatusQuery();
   const connectMutation = useStartGoogleCalendarConnectMutation();
   const disconnectMutation = useDisconnectGoogleCalendarMutation();
@@ -105,7 +108,6 @@ export function GoogleCalendarSyncSection() {
   }, [displayError]);
 
   const refetchStatus = statusQuery.refetch;
-  const syncCalendar = syncMutation.mutateAsync;
 
   useEffect(() => {
     if (!hydrated) return;
@@ -114,6 +116,7 @@ export function GoogleCalendarSyncSection() {
     if (!oauthStatus) return;
 
     const oauthMessage = searchParams.get("message");
+    const syncError = searchParams.get("sync_error")?.trim() || null;
 
     async function handleOauthReturn() {
       if (oauthStatus === "error") {
@@ -129,19 +132,17 @@ export function GoogleCalendarSyncSection() {
           return;
         }
 
+        // The backend callback already ran the initial sync before redirecting.
         const next = await refetchStatus();
         if (next.data?.connected) {
           setOauthNotice("Google Calendar connected successfully.");
-          setError(null);
-          try {
-            await syncCalendar();
-          } catch (err) {
-            setError(
-              err instanceof Error
-                ? `Connected, but events could not be imported: ${err.message}`
-                : "Connected, but events could not be imported. Try Sync now.",
-            );
-          }
+          setError(
+            syncError
+              ? `Connected, but events could not be imported: ${syncError}`
+              : null,
+          );
+          void queryClient.invalidateQueries({ queryKey: queryKeys.tasks });
+          void queryClient.invalidateQueries({ queryKey: queryKeys.events });
         } else {
           setError(
             "Google sign-in finished, but Eventra did not save the connection. Click Connect Google Calendar to try again.",
@@ -155,9 +156,10 @@ export function GoogleCalendarSyncSection() {
     const next = new URLSearchParams(searchParams.toString());
     next.delete("google_calendar");
     next.delete("message");
+    next.delete("sync_error");
     const qs = next.toString();
     router.replace(qs ? `/settings?${qs}` : "/settings", { scroll: false });
-  }, [hydrated, refetchStatus, router, searchParams, syncCalendar]);
+  }, [hydrated, queryClient, refetchStatus, router, searchParams]);
 
   async function handleConnect() {
     setError(null);

@@ -69,6 +69,8 @@ type GoogleEventsListResult = {
   nextSyncToken: string | null;
 };
 
+type IncrementalQuery = { syncToken: string } | { updatedMin: Date };
+
 type LinkedEventRow = {
   id: string;
   googleEventId: string;
@@ -140,7 +142,7 @@ export class GoogleCalendarSyncService {
   ): Promise<GoogleCalendarSyncResult> {
     const accessToken =
       await this.integrationService.getValidAccessToken(userId);
-    const { syncDaysBack, syncDaysForward, lastSyncedAt } =
+    const { syncDaysBack, syncDaysForward, googleSyncToken, lastSyncedAt } =
       await this.integrationService.getSyncWindow(userId);
 
     const timeMin = new Date();
@@ -148,16 +150,21 @@ export class GoogleCalendarSyncService {
     const timeMax = new Date();
     timeMax.setDate(timeMax.getDate() + syncDaysForward);
 
-    const updatedMin =
-      options?.incremental === true && lastSyncedAt
-        ? new Date(lastSyncedAt.getTime() - 120_000)
-        : null;
+    // Prefer Google's sync token; fall back to updatedMin when no token was issued.
+    const incrementalQuery: IncrementalQuery | null =
+      options?.incremental !== true
+        ? null
+        : googleSyncToken
+          ? { syncToken: googleSyncToken }
+          : lastSyncedAt
+            ? { updatedMin: new Date(lastSyncedAt.getTime() - 120_000) }
+            : null;
 
-    if (updatedMin) {
+    if (incrementalQuery) {
       try {
         return await this.runSync(userId, accessToken, {
           mode: 'incremental',
-          updatedMin,
+          incrementalQuery,
           timeMin,
           timeMax,
         });
@@ -183,7 +190,7 @@ export class GoogleCalendarSyncService {
     accessToken: string,
     options: {
       mode: 'full' | 'incremental';
-      updatedMin?: Date;
+      incrementalQuery?: IncrementalQuery;
       timeMin: Date;
       timeMax: Date;
     },
@@ -197,7 +204,7 @@ export class GoogleCalendarSyncService {
             accessToken,
             timeMin,
             timeMax,
-            options.updatedMin!,
+            options.incrementalQuery!,
           )
         : this.fetchPrimaryCalendarEvents(accessToken, timeMin, timeMax),
       incremental
@@ -365,7 +372,10 @@ export class GoogleCalendarSyncService {
     const syncedAt = new Date();
     await this.integrationService.persistSyncMeta(userId, {
       lastSyncedAt: syncedAt,
-      googleSyncToken: incremental ? undefined : (list.nextSyncToken ?? null),
+      googleSyncToken: this.nextStoredSyncToken(
+        options.incrementalQuery,
+        list.nextSyncToken,
+      ),
     });
 
     return {
@@ -374,6 +384,17 @@ export class GoogleCalendarSyncService {
       syncedAt: syncedAt.toISOString(),
       overlaps,
     };
+  }
+
+  /** undefined keeps the stored token; updatedMin queries do not issue a reusable one. */
+  private nextStoredSyncToken(
+    incrementalQuery: IncrementalQuery | undefined,
+    nextSyncToken: string | null,
+  ): string | null | undefined {
+    if (incrementalQuery && 'updatedMin' in incrementalQuery) {
+      return undefined;
+    }
+    return nextSyncToken;
   }
 
   private mappedFieldsChanged(
@@ -609,14 +630,25 @@ export class GoogleCalendarSyncService {
     accessToken: string,
     timeMin: Date,
     timeMax: Date,
-    updatedMin: Date,
+    query: IncrementalQuery,
   ): Promise<GoogleEventsListResult> {
+    if ('syncToken' in query) {
+      // Google rejects timeMin/timeMax/updatedMin alongside syncToken;
+      // out-of-window results are filtered in runSync.
+      const params = new URLSearchParams({
+        singleEvents: 'true',
+        syncToken: query.syncToken,
+        maxResults: String(GoogleCalendarSyncService.PAGE_SIZE),
+      });
+      return this.fetchCalendarEventPages(accessToken, params);
+    }
+
     const params = new URLSearchParams({
       singleEvents: 'true',
       showDeleted: 'true',
       timeMin: timeMin.toISOString(),
       timeMax: timeMax.toISOString(),
-      updatedMin: updatedMin.toISOString(),
+      updatedMin: query.updatedMin.toISOString(),
       maxResults: String(GoogleCalendarSyncService.PAGE_SIZE),
     });
     return this.fetchCalendarEventPages(accessToken, params);

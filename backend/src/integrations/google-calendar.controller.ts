@@ -120,16 +120,17 @@ export class GoogleCalendarController {
         this.googleOAuth.getCalendarCallbackUri(),
       );
       await this.integrationService.upsertFromOAuthTokens(userId, tokens);
+      url.searchParams.set('google_calendar', 'connected');
       try {
         await this.syncService.syncForUser(userId);
       } catch (syncErr) {
+        const syncMessage =
+          syncErr instanceof Error ? syncErr.message : String(syncErr);
         this.logger.warn(
-          `Google Calendar connected for ${userId} but initial sync failed: ${
-            syncErr instanceof Error ? syncErr.message : String(syncErr)
-          }`,
+          `Google Calendar connected for ${userId} but initial sync failed: ${syncMessage}`,
         );
+        url.searchParams.set('sync_error', syncMessage);
       }
-      url.searchParams.set('google_calendar', 'connected');
       res.redirect(url.toString());
     } catch (err) {
       url.searchParams.set('google_calendar', 'error');
