@@ -3,6 +3,7 @@ export const GOOGLE_CALENDAR_STATUS_QUERY = `
     googleCalendarStatus {
       connected
       connectedAt
+      needsReconnect
       lastSyncedAt
       syncDaysBack
       syncDaysForward

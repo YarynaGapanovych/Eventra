@@ -14,7 +14,7 @@ function ResetPasswordContent() {
     <AuthSplitLayout>
       <ResetPasswordForm
         token={token}
-        onRequestLogin={() => router.replace("/")}
+        onRequestLogin={() => router.replace("/login")}
       />
     </AuthSplitLayout>
   );

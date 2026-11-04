@@ -150,6 +150,7 @@ type GoogleCalendarStatus {
   connectedAt: String
   exportEventraEvents: Boolean!
   lastSyncedAt: String
+  needsReconnect: Boolean!
   pendingOverlaps: [GoogleCalendarOverlapNotice!]!
   syncDaysBack: Int!
   syncDaysForward: Int!

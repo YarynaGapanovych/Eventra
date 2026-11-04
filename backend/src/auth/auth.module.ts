@@ -5,7 +5,6 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { AuthResolver } from './auth.resolver';
 import { AuthService } from './auth.service';
 import { GqlAuthGuard } from './gql-auth.guard';
-import { GoogleAuthController } from './google-auth.controller';
 import {
   ConsolePasswordResetMailer,
   PASSWORD_RESET_MAILER,
@@ -25,7 +24,6 @@ import { ResendPasswordResetMailer } from './resend-password-reset-mailer';
       inject: [ConfigService],
     }),
   ],
-  controllers: [GoogleAuthController],
   providers: [
     AuthService,
     AuthResolver,

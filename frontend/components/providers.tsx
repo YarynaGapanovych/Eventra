@@ -1,6 +1,7 @@
 "use client";
 
 import { Toaster } from "@/components/ui/sonner";
+import { isApiTimeoutError } from "@/lib/api-fetch";
 import { useAuthStore } from "@/stores/auth-store";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
@@ -34,7 +35,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
         defaultOptions: {
           queries: {
             staleTime: 30_000,
-            retry: 4,
+            // A timed-out request already waited a full minute; surface it.
+            retry: (failureCount, error) =>
+              !isApiTimeoutError(error) && failureCount < 4,
             retryDelay: (attempt) => Math.min(2000 * 2 ** attempt, 15_000),
           },
         },

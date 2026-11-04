@@ -28,7 +28,7 @@ function GoogleAuthCallbackContent() {
         .catch((err) => {
           const msg =
             err instanceof Error ? err.message : "Google sign-in failed.";
-          router.replace(`/?google_auth=error&message=${encodeURIComponent(msg)}`);
+          router.replace(`/login?google_auth=error&message=${encodeURIComponent(msg)}`);
         });
       return;
     }
@@ -37,7 +37,7 @@ function GoogleAuthCallbackContent() {
       message?.trim() ||
       (status === "error" ? "Google sign-in was cancelled." : "Google sign-in failed.");
     router.replace(
-      `/?google_auth=error&message=${encodeURIComponent(errorMessage)}`,
+      `/login?google_auth=error&message=${encodeURIComponent(errorMessage)}`,
     );
   }, [router, searchParams, setSession]);
 

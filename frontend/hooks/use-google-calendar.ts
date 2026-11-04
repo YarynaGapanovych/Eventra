@@ -1,3 +1,4 @@
+import { rememberGoogleCalendarLinked } from "@/lib/google-auth";
 import { graphqlRequest } from "@/lib/graphql";
 import {
   ACKNOWLEDGE_GOOGLE_CALENDAR_OVERLAPS_MUTATION,
@@ -20,7 +21,9 @@ async function fetchGoogleCalendarStatus(): Promise<GoogleCalendarSyncState> {
   const data = await graphqlRequest<{
     googleCalendarStatus: Partial<GoogleCalendarSyncState>;
   }>(GOOGLE_CALENDAR_STATUS_QUERY);
-  return normalizeGoogleCalendarStatus(data.googleCalendarStatus);
+  const status = normalizeGoogleCalendarStatus(data.googleCalendarStatus);
+  rememberGoogleCalendarLinked(status.connected);
+  return status;
 }
 
 export function useGoogleCalendarStatusQuery() {
@@ -69,7 +72,10 @@ export function useDisconnectGoogleCalendarMutation() {
     mutationFn: async () => {
       await graphqlRequest(DISCONNECT_GOOGLE_CALENDAR_MUTATION);
     },
-    onSuccess: invalidate,
+    onSuccess: () => {
+      rememberGoogleCalendarLinked(false);
+      invalidate();
+    },
   });
 }
 
@@ -85,6 +91,8 @@ export function useSyncGoogleCalendarMutation() {
       );
     },
     onSuccess: invalidate,
+    // A failed sync may have flagged the connection as needing a reconnect.
+    onError: invalidate,
   });
 }
 

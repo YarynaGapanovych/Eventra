@@ -227,11 +227,11 @@ export function RegisterForm({ onSuccess, onRequestLogin }: RegisterFormProps) {
 
         <p className="text-center text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
           By creating an account, you agree to our{" "}
-          <a className="underline underline-offset-2" href="#">
+          <a className="underline underline-offset-2" href="/terms">
             Terms of Service
           </a>{" "}
           and{" "}
-          <a className="underline underline-offset-2" href="#">
+          <a className="underline underline-offset-2" href="/privacy">
             Privacy Policy
           </a>
           .

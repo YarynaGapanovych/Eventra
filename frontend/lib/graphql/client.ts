@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api-fetch";
 import { getStoredAuth } from "@/lib/auth-storage";
 import { API_BASE } from "@/lib/tasks-api";
 
@@ -12,7 +13,7 @@ export async function graphqlRequest<T>(
   token?: string,
 ): Promise<T> {
   const accessToken = token ?? getStoredAuth()?.token;
-  const res = await fetch(`${API_BASE}/graphql`, {
+  const res = await apiFetch(`${API_BASE}/graphql`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

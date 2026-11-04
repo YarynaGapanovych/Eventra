@@ -59,6 +59,9 @@ export class GoogleCalendarStatus {
   @Field(() => String, { nullable: true })
   connectedAt!: string | null;
 
+  @Field()
+  needsReconnect!: boolean;
+
   @Field(() => String, { nullable: true })
   lastSyncedAt!: string | null;
 

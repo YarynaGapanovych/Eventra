@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Controller,
   Get,
+  Logger,
   Query,
   Res,
   ServiceUnavailableException,
@@ -9,14 +10,27 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import type { Response } from 'express';
+import { GoogleCalendarIntegrationService } from '../integrations/google-calendar-integration.service';
+import { GoogleCalendarSyncService } from '../integrations/google-calendar-sync.service';
+import type { GoogleOAuthTokens } from '../integrations/google-oauth.service';
 import { AuthService } from './auth.service';
 import {
   defaultFrontendOrigin,
   validateFrontendRedirectUri,
 } from './frontend-redirect';
 
+/** Same scopes the Settings "Connect Google Calendar" flow asks for. */
+const CALENDAR_SCOPES = [
+  'https://www.googleapis.com/auth/calendar',
+  'https://www.googleapis.com/auth/calendar.events',
+];
+
 type GoogleTokenResponse = {
   access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+  scope?: string;
+  token_type?: string;
   id_token?: string;
   error?: string;
   error_description?: string;
@@ -31,15 +45,24 @@ type GoogleUserInfo = {
 
 @Controller('auth/google')
 export class GoogleAuthController {
+  private readonly logger = new Logger(GoogleAuthController.name);
+
   constructor(
     private readonly config: ConfigService,
     private readonly authService: AuthService,
     private readonly jwtService: JwtService,
+    private readonly calendarIntegration: GoogleCalendarIntegrationService,
+    private readonly calendarSync: GoogleCalendarSyncService,
   ) {}
 
+  /**
+   * `calendar=1` (sent by browsers that have linked Google Calendar) also asks
+   * for Calendar access, so signing in renews an expired Calendar connection.
+   */
   @Get('connect')
   connect(
     @Query('redirect_uri') redirectUri: string,
+    @Query('calendar') calendar: string | undefined,
     @Res() res: Response,
   ): void {
     const clientId = this.config.get<string>('GOOGLE_CLIENT_ID');
@@ -59,19 +82,26 @@ export class GoogleAuthController {
       this.config.get<string>('GOOGLE_AUTH_REDIRECT_URI') ??
       `http://localhost:${port}/auth/google/callback`;
 
+    const withCalendar = calendar === '1';
     const state = Buffer.from(
-      JSON.stringify({ redirectUri: safeRedirect }),
+      JSON.stringify({ redirectUri: safeRedirect, calendar: withCalendar }),
     ).toString('base64url');
 
     const params = new URLSearchParams({
       client_id: clientId.trim(),
       redirect_uri: callbackUri,
       response_type: 'code',
-      scope: ['openid', 'email', 'profile'].join(' '),
-      access_type: 'online',
+      scope: [
+        'openid',
+        'email',
+        'profile',
+        ...(withCalendar ? CALENDAR_SCOPES : []),
+      ].join(' '),
+      access_type: withCalendar ? 'offline' : 'online',
       prompt: 'select_account',
       state,
     });
+    if (withCalendar) params.set('include_granted_scopes', 'true');
 
     res.redirect(
       `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`,
@@ -98,10 +128,12 @@ export class GoogleAuthController {
 
     const fallbackRedirect = `${defaultFrontendOrigin()}/auth/google/callback`;
     let redirectUri = fallbackRedirect;
+    let withCalendar = false;
     try {
       const parsed = JSON.parse(
         Buffer.from(state, 'base64url').toString('utf8'),
-      ) as { redirectUri?: string };
+      ) as { redirectUri?: string; calendar?: boolean };
+      withCalendar = parsed.calendar === true;
       if (parsed.redirectUri?.trim()) {
         try {
           redirectUri = validateFrontendRedirectUri(
@@ -145,6 +177,9 @@ export class GoogleAuthController {
         email: profile.email,
         name: profile.name,
       });
+      if (withCalendar) {
+        await this.renewCalendarAccess(authPayload.user.id, profile.tokens);
+      }
       const exchangeCode = this.authService.signExchangeToken(
         authPayload.user.id,
       );
@@ -159,6 +194,39 @@ export class GoogleAuthController {
       );
       res.redirect(url.toString());
     }
+  }
+
+  /**
+   * Saves Calendar tokens from sign-in for users who already linked Google
+   * Calendar (this also clears `needsReconnect`). Never blocks sign-in.
+   */
+  private async renewCalendarAccess(
+    userId: string,
+    tokens: GoogleOAuthTokens,
+  ): Promise<void> {
+    const grantedCalendar = (tokens.scope ?? '')
+      .split(' ')
+      .includes(CALENDAR_SCOPES[0]);
+    if (!tokens.refreshToken || !grantedCalendar) return;
+    try {
+      const status = await this.calendarIntegration.getStatus(userId);
+      if (!status.connected) return;
+      await this.calendarIntegration.upsertFromOAuthTokens(userId, tokens);
+    } catch (err) {
+      this.logger.warn(
+        `Could not renew Google Calendar access for ${userId}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+      return;
+    }
+    void this.calendarSync.syncForUser(userId).catch((err: unknown) => {
+      this.logger.warn(
+        `Google Calendar sync after sign-in failed for ${userId}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    });
   }
 
   private isCalendarOAuthState(state: string | undefined): boolean {
@@ -183,6 +251,7 @@ export class GoogleAuthController {
     googleId: string;
     email: string;
     name: string | null;
+    tokens: GoogleOAuthTokens;
   }> {
     const clientId = this.config.get<string>('GOOGLE_CLIENT_ID')?.trim();
     const clientSecret = this.config.get<string>('GOOGLE_CLIENT_SECRET')?.trim();
@@ -231,6 +300,13 @@ export class GoogleAuthController {
       googleId: profile.sub,
       email: profile.email.trim().toLowerCase(),
       name: profile.name?.trim() || null,
+      tokens: {
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token ?? null,
+        expiresIn: tokenData.expires_in ?? null,
+        scope: tokenData.scope ?? null,
+        tokenType: tokenData.token_type ?? null,
+      },
     };
   }
 }

@@ -1,7 +1,8 @@
+import { apiFetch } from "@/lib/api-fetch";
 import { API_BASE } from "@/lib/tasks-api";
 
 export async function fetchApiHealth(): Promise<true> {
-  const res = await fetch(`${API_BASE}/health`, { cache: "no-store" });
+  const res = await apiFetch(`${API_BASE}/health`, { cache: "no-store" });
   if (!res.ok) {
     throw new Error(`API health check failed (${res.status})`);
   }

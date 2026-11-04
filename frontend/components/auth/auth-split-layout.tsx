@@ -20,7 +20,7 @@ export function AuthSplitLayout({ children }: AuthSplitLayoutProps) {
         <div className="pointer-events-none absolute right-32 -bottom-8 h-44 w-44 rounded-full border border-teal-500/20" />
 
         <div className="relative z-10 flex h-full min-h-0 flex-col">
-          <p className="shrink-0 text-3xl font-semibold leading-none uppercase tracking-[0.08em] text-teal-600 xl:text-4xl">
+          <p className="shrink-0 text-3xl font-semibold leading-none text-teal-600 xl:text-4xl">
             Eventra
           </p>
           <div className="flex min-h-0 flex-1 flex-col justify-center gap-5 overflow-y-auto xl:gap-8">
@@ -63,7 +63,7 @@ export function AuthSplitLayout({ children }: AuthSplitLayoutProps) {
       </div>
 
       <div className="relative flex min-h-dvh flex-col overflow-y-auto bg-zinc-50/95 px-5 py-8 dark:bg-zinc-950/85 lg:h-full lg:min-h-0 lg:p-7">
-        <p className="mb-8 shrink-0 text-2xl font-semibold uppercase tracking-[0.08em] text-teal-600 lg:hidden">
+        <p className="mb-8 shrink-0 text-2xl font-semibold text-teal-600 lg:hidden">
           Eventra
         </p>
         <div className="flex flex-1 flex-col overflow-y-auto lg:min-h-0 lg:justify-center">
