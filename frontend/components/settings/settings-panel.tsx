@@ -404,7 +404,7 @@ export function SettingsPanel() {
         {!signedIn && hydrated ? (
           <p className="text-sm text-amber-700 dark:text-amber-400">
             Sign in to Eventra to save settings to your account.{" "}
-            <Link href="/" className="font-medium underline underline-offset-2">
+            <Link href="/login" className="font-medium underline underline-offset-2">
               Go to sign in
             </Link>
           </p>

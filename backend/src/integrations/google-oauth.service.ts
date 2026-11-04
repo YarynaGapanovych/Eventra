@@ -20,6 +20,16 @@ type GoogleTokenResponse = {
   error_description?: string;
 };
 
+export const GOOGLE_ACCESS_REVOKED_MESSAGE =
+  'Google Calendar access expired. Disconnect and reconnect Google Calendar in Settings.';
+
+/** Google rejected the stored refresh token (`invalid_grant`); only a reconnect fixes it. */
+export class GoogleAccessRevokedError extends BadRequestException {
+  constructor() {
+    super(GOOGLE_ACCESS_REVOKED_MESSAGE);
+  }
+}
+
 @Injectable()
 export class GoogleOAuthService {
   constructor(private readonly config: ConfigService) {}
@@ -102,6 +112,9 @@ export class GoogleOAuthService {
     });
 
     const data = (await res.json()) as GoogleTokenResponse;
+    if (data.error === 'invalid_grant') {
+      throw new GoogleAccessRevokedError();
+    }
     if (!res.ok || !data.access_token) {
       throw new BadRequestException(this.refreshErrorMessage(data));
     }
@@ -116,9 +129,6 @@ export class GoogleOAuthService {
   }
 
   private refreshErrorMessage(data: GoogleTokenResponse): string {
-    if (data.error === 'invalid_grant') {
-      return 'Google Calendar access expired. Disconnect and reconnect Google Calendar in Settings.';
-    }
     return (
       data.error_description?.trim() ||
       data.error ||

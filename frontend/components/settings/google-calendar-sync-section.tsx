@@ -27,7 +27,12 @@ import {
   SYNC_DAYS_FORWARD_PRESETS,
 } from "@/lib/google-calendar-sync";
 import { useAuthStore } from "@/stores/auth-store";
-import { CalendarSync, CheckCircle2, Loader2 } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarSync,
+  CheckCircle2,
+  Loader2,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -279,7 +284,10 @@ export function GoogleCalendarSyncSection() {
               })
             }
           >
-            <SelectTrigger id="google-sync-days-back" className="w-full max-w-xs">
+            <SelectTrigger
+              id="google-sync-days-back"
+              className="w-full max-w-xs"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -299,8 +307,7 @@ export function GoogleCalendarSyncSection() {
             onValueChange={(value) =>
               void handleWindowChange({
                 syncDaysBack: state.syncDaysBack,
-                syncDaysForward:
-                  Number(value) || DEFAULT_SYNC_DAYS_FORWARD,
+                syncDaysForward: Number(value) || DEFAULT_SYNC_DAYS_FORWARD,
               })
             }
           >
@@ -332,9 +339,7 @@ export function GoogleCalendarSyncSection() {
           className="mt-0.5"
           checked={state.exportEventraEvents}
           disabled={busy || !state.connected || !signedIn}
-          onCheckedChange={(checked) =>
-            void handleExportChange(checked)
-          }
+          onCheckedChange={(checked) => void handleExportChange(checked)}
         />
         <div className="min-w-0">
           <Label
@@ -354,7 +359,7 @@ export function GoogleCalendarSyncSection() {
         <p className="mt-4 text-sm text-amber-700 dark:text-amber-400">
           Sign in to Eventra first — Google Calendar linking is saved to your
           account.{" "}
-          <Link href="/" className="font-medium underline underline-offset-2">
+          <Link href="/login" className="font-medium underline underline-offset-2">
             Go to sign in
           </Link>
         </p>
@@ -366,39 +371,58 @@ export function GoogleCalendarSyncSection() {
         </p>
       ) : state.connected ? (
         <>
-          <div className="mt-4 flex items-start gap-3 rounded-xl border border-teal-200/80 bg-teal-50/80 px-4 py-3 dark:border-teal-900/60 dark:bg-teal-950/30">
-            <CheckCircle2
-              className="mt-0.5 size-5 shrink-0 text-teal-600 dark:text-teal-400"
-              aria-hidden
-            />
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-teal-800 dark:text-teal-300">
-                Google Calendar is connected
-              </p>
-              {connectedAtLabel ? (
-                <p className="mt-0.5 text-sm text-teal-700/80 dark:text-teal-400/80">
-                  Connected {connectedAtLabel}
-                  {lastSyncedLabel
-                    ? ` · Last synced ${lastSyncedLabel}`
-                    : " · Not synced yet"}
+          {state.needsReconnect ? (
+            <div
+              role="alert"
+              className="mt-4 flex items-start gap-3 rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 dark:border-amber-900/60 dark:bg-amber-950/30"
+            >
+              <AlertTriangle
+                className="mt-0.5 size-5 shrink-0 text-amber-600 dark:text-amber-400"
+                aria-hidden
+              />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                  Reconnect Google Calendar
                 </p>
-              ) : null}
+                <p className="mt-0.5 text-sm text-amber-700/90 dark:text-amber-400/80">
+                  Google stopped accepting Eventra&apos;s access, so events
+                  aren&apos;t syncing. Reconnect to resume.
+                  {lastSyncedLabel ? ` Last synced ${lastSyncedLabel}.` : ""}
+                </p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="mt-4 flex items-start gap-3 rounded-xl border border-teal-200/80 bg-teal-50/80 px-4 py-3 dark:border-teal-900/60 dark:bg-teal-950/30">
+              <CheckCircle2
+                className="mt-0.5 size-5 shrink-0 text-teal-600 dark:text-teal-400"
+                aria-hidden
+              />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-teal-800 dark:text-teal-300">
+                  Google Calendar is connected
+                </p>
+                {connectedAtLabel ? (
+                  <p className="mt-0.5 text-sm text-teal-700/80 dark:text-teal-400/80">
+                    Connected {connectedAtLabel}
+                    {lastSyncedLabel
+                      ? ` · Last synced ${lastSyncedLabel}`
+                      : " · Not synced yet"}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          )}
 
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <Button
               type="button"
               variant="outline"
               className="h-11 w-full gap-2 rounded-xl border-zinc-300 bg-white text-base text-zinc-800 shadow-sm hover:bg-zinc-100 sm:w-auto dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
-              disabled={busy}
+              disabled={busy || state.needsReconnect}
               onClick={() => void handleSync()}
             >
               {syncing ? (
-                <Loader2
-                  className="size-4 shrink-0 animate-spin"
-                  aria-hidden
-                />
+                <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
               ) : (
                 <CalendarSync className="size-4 shrink-0" aria-hidden />
               )}

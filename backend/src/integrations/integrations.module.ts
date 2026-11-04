@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { GoogleAuthController } from '../auth/google-auth.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { GoogleCalendarController } from './google-calendar.controller';
 import { GoogleCalendarIntegrationService } from './google-calendar-integration.service';
@@ -10,7 +11,9 @@ import { GoogleOAuthService } from './google-oauth.service';
 
 @Module({
   imports: [AuthModule, PrismaModule],
-  controllers: [GoogleCalendarController],
+  // GoogleAuthController lives here so sign-in can renew Calendar tokens
+  // without a circular AuthModule <-> IntegrationsModule import.
+  controllers: [GoogleAuthController, GoogleCalendarController],
   providers: [
     GoogleOAuthService,
     GoogleCalendarIntegrationService,

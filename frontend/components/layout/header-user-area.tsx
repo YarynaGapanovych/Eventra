@@ -11,7 +11,7 @@ export function HeaderUserArea() {
 
   function signOut() {
     logout();
-    router.replace("/");
+    router.replace("/login");
   }
 
   if (!user) return null;

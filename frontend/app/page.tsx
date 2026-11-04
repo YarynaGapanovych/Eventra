@@ -1,9 +1,5 @@
-import { HomeAuth } from "@/components/auth/home-auth";
+import { Landing } from "@/components/landing/landing";
 
 export default function HomePage() {
-  return (
-    <>
-      <HomeAuth />
-    </>
-  );
+  return <Landing />;
 }

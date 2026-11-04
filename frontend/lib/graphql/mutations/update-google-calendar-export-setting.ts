@@ -5,6 +5,7 @@ export const UPDATE_GOOGLE_CALENDAR_EXPORT_SETTING_MUTATION = `
     ) {
       connected
       connectedAt
+      needsReconnect
       lastSyncedAt
       syncDaysBack
       syncDaysForward

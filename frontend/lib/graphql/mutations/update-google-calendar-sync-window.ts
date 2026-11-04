@@ -5,6 +5,7 @@ export const UPDATE_GOOGLE_CALENDAR_SYNC_WINDOW_MUTATION = `
     updateGoogleCalendarSyncWindow(input: $input) {
       connected
       connectedAt
+      needsReconnect
       lastSyncedAt
       syncDaysBack
       syncDaysForward

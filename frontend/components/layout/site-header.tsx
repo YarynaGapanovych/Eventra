@@ -41,7 +41,7 @@ function AccountMenu() {
   function handleLogout() {
     logout();
     setOpen(false);
-    router.replace("/");
+    router.replace("/login");
   }
 
   return (

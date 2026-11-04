@@ -15,7 +15,7 @@ export function AppAuthGate({ children }: { children: React.ReactNode }) {
 
     if (!token) {
       setAllowed(false);
-      router.replace("/");
+      router.replace("/login");
       return;
     }
     setAllowed(true);

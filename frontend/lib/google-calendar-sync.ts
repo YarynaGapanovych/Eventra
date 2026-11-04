@@ -15,6 +15,8 @@ export type GoogleCalendarOverlapNotice = {
 export type GoogleCalendarSyncState = {
   connected: boolean;
   connectedAt: string | null;
+  /** Google rejected the stored access; the user must reconnect. */
+  needsReconnect: boolean;
   lastSyncedAt: string | null;
   syncDaysBack: number;
   syncDaysForward: number;
@@ -25,6 +27,7 @@ export type GoogleCalendarSyncState = {
 export const googleCalendarDefaultState: GoogleCalendarSyncState = {
   connected: false,
   connectedAt: null,
+  needsReconnect: false,
   lastSyncedAt: null,
   syncDaysBack: DEFAULT_SYNC_DAYS_BACK,
   syncDaysForward: DEFAULT_SYNC_DAYS_FORWARD,
@@ -72,6 +75,7 @@ export function normalizeGoogleCalendarStatus(
     connected: data.connected === true,
     connectedAt:
       typeof data.connectedAt === "string" ? data.connectedAt : null,
+    needsReconnect: data.needsReconnect === true,
     lastSyncedAt:
       typeof data.lastSyncedAt === "string" ? data.lastSyncedAt : null,
     syncDaysBack: coercePreset(

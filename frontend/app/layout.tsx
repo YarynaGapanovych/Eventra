@@ -24,6 +24,10 @@ export const metadata: Metadata = {
   description:
     "Eventra — collaborative task scheduling system with real-time updates and event history",
   applicationName: "Eventra",
+  // Google Search Console ownership check for the OAuth home-page domain.
+  verification: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim()
+    ? { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION.trim() }
+    : undefined,
   appleWebApp: {
     capable: true,
     title: "Eventra",

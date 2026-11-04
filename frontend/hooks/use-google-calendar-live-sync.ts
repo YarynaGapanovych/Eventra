@@ -28,9 +28,10 @@ export function useGoogleCalendarLiveSync() {
   const hydrated = useAuthStore((s) => s.hydrated);
   const statusQuery = useGoogleCalendarStatusQuery();
   const connected = statusQuery.data?.connected === true;
+  const needsReconnect = statusQuery.data?.needsReconnect === true;
 
   const run = useCallback(async () => {
-    if (!hydrated || !token || !connected) return;
+    if (!hydrated || !token || !connected || needsReconnect) return;
     if (document.visibilityState !== "visible") return;
     if (liveSyncInFlight) return;
     if (Date.now() - lastLiveSyncAt < MIN_INTERVAL_MS) return;
@@ -62,14 +63,18 @@ export function useGoogleCalendarLiveSync() {
         );
       }
     } catch {
-      /* background polls stay silent */
+      // Background polls stay silent; refresh the status so Settings can show
+      // a "reconnect needed" warning if Google rejected the stored access.
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.googleCalendarStatus,
+      });
     } finally {
       liveSyncInFlight = false;
     }
-  }, [connected, hydrated, queryClient, token]);
+  }, [connected, hydrated, needsReconnect, queryClient, token]);
 
   useEffect(() => {
-    if (!hydrated || !token || !connected) return;
+    if (!hydrated || !token || !connected || needsReconnect) return;
 
     void run();
 
@@ -92,7 +97,7 @@ export function useGoogleCalendarLiveSync() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [connected, hydrated, run, token]);
+  }, [connected, hydrated, needsReconnect, run, token]);
 }
 
 export function GoogleCalendarLiveSync() {

@@ -16,6 +16,7 @@ import {
   type CalendarOverlapNotice,
 } from './google-calendar.types';
 import {
+  GoogleAccessRevokedError,
   GoogleOAuthService,
   type GoogleOAuthTokens,
 } from './google-oauth.service';
@@ -23,6 +24,7 @@ import {
 export type GoogleCalendarConnectionStatus = {
   connected: boolean;
   connectedAt: string | null;
+  needsReconnect: boolean;
   lastSyncedAt: string | null;
   syncDaysBack: number;
   syncDaysForward: number;
@@ -70,6 +72,7 @@ export class GoogleCalendarIntegrationService {
       return {
         connected: false,
         connectedAt: null,
+        needsReconnect: false,
         lastSyncedAt: null,
         syncDaysBack: DEFAULT_SYNC_DAYS_BACK,
         syncDaysForward: DEFAULT_SYNC_DAYS_FORWARD,
@@ -80,6 +83,7 @@ export class GoogleCalendarIntegrationService {
     return {
       connected: true,
       connectedAt: row.connectedAt.toISOString(),
+      needsReconnect: row.needsReconnect,
       lastSyncedAt: row.lastSyncedAt?.toISOString() ?? null,
       syncDaysBack: row.syncDaysBack,
       syncDaysForward: row.syncDaysForward,
@@ -217,6 +221,9 @@ export class GoogleCalendarIntegrationService {
     if (!row) {
       throw new BadRequestException('Google Calendar is not connected');
     }
+    if (row.needsReconnect) {
+      throw new GoogleAccessRevokedError();
+    }
 
     const bufferMs = 60_000;
     if (
@@ -230,7 +237,18 @@ export class GoogleCalendarIntegrationService {
     const refreshToken = this.googleOAuth.decryptToken(
       row.refreshTokenEncrypted,
     );
-    const tokens = await this.googleOAuth.refreshAccessToken(refreshToken);
+    let tokens: GoogleOAuthTokens;
+    try {
+      tokens = await this.googleOAuth.refreshAccessToken(refreshToken);
+    } catch (err) {
+      if (err instanceof GoogleAccessRevokedError) {
+        await this.prisma.googleCalendarIntegration.update({
+          where: { userId },
+          data: { needsReconnect: true },
+        });
+      }
+      throw err;
+    }
     await this.upsertFromOAuthTokens(userId, tokens);
     return tokens.accessToken;
   }
@@ -273,6 +291,7 @@ export class GoogleCalendarIntegrationService {
         refreshTokenEncrypted,
         accessTokenEncrypted,
         accessTokenExpiresAt,
+        needsReconnect: false,
       },
     });
   }
